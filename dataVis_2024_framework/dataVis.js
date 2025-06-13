@@ -71,7 +71,7 @@ function init() {
 
     const readFile = function () {
         clear();                // Clear existing drawings
-        selectedIds.clear();    // ✅ Clear old selections
+        selectedIds.clear();    // Clear old selections
 
         let reader = new FileReader();
         reader.onloadend = function () {
@@ -235,7 +235,8 @@ function CreateDataTable(_data) {
         .style("font-family", "Arial, sans-serif");
 
     // Extract headers
-    let headers = Object.keys(_data[0]);
+    let headers = Object.keys(_data[0]).filter(h => h !== "_id");
+
 
     // Add headers
     let thead = table.append("thead");
@@ -383,73 +384,67 @@ function renderScatterplot() {
         });
 }
 
+function renderRadarChart() {
+    if (!data || !dimensions || dimensions.length === 0) return;
 
-    function renderRadarChart() {
-        if (!data || !dimensions || dimensions.length === 0) return;
-    
-        // Clear radar chart and legend
-        radar.selectAll(".radar-line").remove();
-        radar.selectAll(".radar-dot").remove();
-        d3.select("#legend").html("<strong>Legend:</strong>");
-    
-        // Find first non-numeric field for legend label
-        const allKeys = Object.keys(data[0]);
-        const labelField = allKeys.find(k => !dimensions.includes(k) && k !== "_id");
-    
-        // Scale each dimension to radius
-        const axisScales = {};
-        dimensions.forEach(dim => {
-            const extent = d3.extent(data, d => +d[dim]);
-            axisScales[dim] = d3.scaleLinear().domain(extent).range([0, radius * 0.85]);
+    // Clear radar chart and legend
+    radar.selectAll(".radar-line").remove();
+    radar.selectAll(".radar-dot").remove();
+    d3.select("#legend").html("<strong>Legend:</strong>");
+
+    // Find label field (for displaying in legend)
+    const allKeys = Object.keys(data[0]);
+    const labelField = allKeys.find(k => !dimensions.includes(k) && k !== "_id");
+
+    // Set up scales for each axis
+    const axisScales = {};
+    dimensions.forEach(dim => {
+        const extent = d3.extent(data, d => +d[dim]);
+        axisScales[dim] = d3.scaleLinear().domain(extent).range([0, radius * 0.85]);
+    });
+
+    const line = d3.lineRadial()
+        .radius(d => d.value)
+        .angle((d, i) => i * radarAxesAngle)
+        .curve(d3.curveLinearClosed);
+
+    data.forEach((d) => {
+        if (!selectedIds.has(d._id)) return;
+
+        const values = dimensions.map((dim, i) => {
+            const num = parseFloat(d[dim]);
+            return {
+                axis: dim,
+                value: isFinite(num) ? axisScales[dim](num) : 0
+            };
         });
-    
-        const color = d3.scaleOrdinal(d3.schemeCategory10);
-        const line = d3.lineRadial()
-            .radius(d => d.value)
-            .angle((d, i) => i * radarAxesAngle)
-            .curve(d3.curveLinearClosed);
-    
-        let colorIndex = 0;
-    
-        data.forEach((d, i) => {
-            if (!selectedIds.has(d._id)) return;
-    
-            const values = dimensions.map((dim, i) => {
-                const raw = d[dim];
-                const num = parseFloat(raw);
-                const scaled = axisScales[dim];
-                return {
-                    axis: dim,
-                    value: isFinite(num) ? scaled(num) : 0  // fallback to 0 if not a valid number
-                };
-            });
-            
-            
-    
-            // Draw polygon
-            radar.append("path")
-                .datum(values)
-                .attr("class", "radar-line radar-id-" + d._id)
-                .attr("d", line)
-                .style("fill", color(colorIndex))
-                .style("fill-opacity", 0.4)
-                .style("stroke", color(colorIndex))
-                .style("stroke-width", 2);
-    
-            // Dots on axes
-            radar.selectAll(".radar-dot-" + d._id)
-                .data(values)
-                .enter()
-                .append("circle")
-                .attr("class", "radar-dot radar-dot-" + d._id)
-                .attr("cx", (v, i) => radarX(v.value, i))
-                .attr("cy", (v, i) => radarY(v.value, i))
-                .attr("r", 3)
-                .style("fill", color(colorIndex));
-    
-            // Legend entry using first column
-            const label = d[labelField] || `Data ${d._id}`;
-            // Create a container for the legend item
+
+        // Use color from the same map as scatterplot
+        const pointColor = colorById.get(d._id) || "gray";
+
+        // Draw radar polygon
+        radar.append("path")
+            .datum(values)
+            .attr("class", "radar-line radar-id-" + d._id)
+            .attr("d", line)
+            .style("fill", pointColor)
+            .style("fill-opacity", 0.4)
+            .style("stroke", pointColor)
+            .style("stroke-width", 2);
+
+        // Dots on axes
+        radar.selectAll(".radar-dot-" + d._id)
+            .data(values)
+            .enter()
+            .append("circle")
+            .attr("class", "radar-dot radar-dot-" + d._id)
+            .attr("cx", (v, i) => radarX(v.value, i))
+            .attr("cy", (v, i) => radarY(v.value, i))
+            .attr("r", 3)
+            .style("fill", pointColor);
+
+        // Add legend entry
+        const label = d[labelField] || `Data ${d._id}`;
         const legendItem = d3.select("#legend")
             .append("div")
             .attr("class", "legend-item")
@@ -461,38 +456,37 @@ function renderScatterplot() {
             .style("gap", "6px");
 
         legendItem.append("span").text(label);
+
+        // Add remove (×) button
         legendItem.append("span")
             .html("&times;")
             .style("cursor", "pointer")
             .style("margin-left", "6px")
             .on("click", function () {
-        // 1. Remove from selection
-        selectedIds.delete(d._id);
+                // 1. Remove from selection
+                selectedIds.delete(d._id);
 
-        // 2. Remove radar elements
-        radar.selectAll(".radar-id-" + d._id).remove();
-        radar.selectAll(".radar-dot-" + d._id).remove();
+                // 2. Remove radar chart elements
+                radar.selectAll(".radar-id-" + d._id).remove();
+                radar.selectAll(".radar-dot-" + d._id).remove();
 
-        // 3. Remove this legend item (this = span, parent = div)
-        d3.select(this.parentNode).remove();
+                // 3. Remove this legend entry
+                d3.select(this.parentNode).remove();
 
-        // 4. Update the corresponding scatterplot point
-        scatter.selectAll("circle")
-            .filter(function () {
-                return +d3.select(this).attr("data-id") === d._id;
-            })
-            .transition().duration(300)
-            .style("fill", "black")
-            .style("fill-opacity", 0.3)
-            .style("stroke", "#333")
-            .style("stroke-width", 0.5);
-    });
-
-        
+                // 4. Unselect scatterplot point
+                scatter.selectAll("circle")
+                    .filter(function () {
+                        return +d3.select(this).attr("data-id") === d._id;
+                    })
+                    .transition().duration(300)
+                    .style("fill", "black")
+                    .style("fill-opacity", 0.3)
+                    .style("stroke", "#333")
+                    .style("stroke-width", 0.5);
             });
-            
-  
+    });
 }
+
 
     // TODO: show selected items in legend
 
