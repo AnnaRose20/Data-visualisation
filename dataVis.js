@@ -72,6 +72,9 @@ function init() {
     const readFile = function () {
         clear();                // Clear existing drawings
         selectedIds.clear();    // Clear old selections
+        colorById.clear();
+        colorPool = [...colorPalette];
+
 
         let reader = new FileReader();
         reader.onloadend = function () {
@@ -280,7 +283,14 @@ function CreateDataTable(_data) {
             });
 }
 // Global map to store colors by data point ID
+const colorPalette = [
+    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+];
 const colorById = new Map();
+let colorPool = [...colorPalette]; // clone
+const maxSelectable = 10;  // Change to 10 if needed
+
 
 function renderScatterplot() {
     if (!data || data.length === 0) return;
@@ -367,22 +377,43 @@ function renderScatterplot() {
         })
         .on("click", function (event, d) {
             const circle = d3.select(this);
+        
+            // Deselect case
             if (selectedIds.has(d._id)) {
                 selectedIds.delete(d._id);
+        
+                const releasedColor = colorById.get(d._id);
+                if (releasedColor && !colorPool.includes(releasedColor)) {
+                    colorPool.push(releasedColor);
+                }
+        
+                colorById.delete(d._id);
+        
                 circle
                     .style("fill", baseColor)
                     .style("fill-opacity", 0.3)
                     .style("stroke", "#333");
+        
             } else {
+                if (selectedIds.size >= maxSelectable) {
+                    alert(`You can select up to ${maxSelectable} data points.`);
+                    return;
+                }
+        
+                const assignedColor = colorPool.shift() || "gray";  // fallback
+                colorById.set(d._id, assignedColor);
+        
                 selectedIds.add(d._id);
+        
                 circle
-                    .style("fill", colorById.get(d._id))
+                    .style("fill", assignedColor)
                     .style("fill-opacity", 1.0)
-                    .style("stroke", colorById.get(d._id));
+                    .style("stroke", assignedColor);
             }
-
+        
             renderRadarChart(); // Update radar on selection change
         })
+        
         .transition()
         .duration(600)
         .attr("r", d => sizeScale(+d[sizeDim]));
