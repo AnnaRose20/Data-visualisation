@@ -88,6 +88,18 @@
         </div>
         <!-- scatterplot SVG -->
         <div id="sp"></div>
+        <div id="tooltip" style="
+        position: absolute;
+        background: white;
+        border: 1px solid #aaa;
+        border-radius: 4px;
+        padding: 8px;
+        font-size: 12px;
+        pointer-events: none;
+        display: none;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        z-index: 10;"></div>
+
     </div>
 
     <!-- radar chart -->
@@ -95,9 +107,7 @@
         <h2>Radar Chart</h2>
         <!-- radar chart SVG -->
         <div id="radar"></div>
-        <div id="legend">
-            <b>Legend:</b><br/>
-        </div>
+        <div id="legend" style="margin-top: 20px;"><strong>Legend:</strong></div>
     </div>
 
 </div>
