@@ -18,7 +18,6 @@ let data;
 let selectedIds = new Set(); // track clicked data row IDs
 
 
-
 let dimensions = ["dimension 1", "dimension 2", "dimension 3", "dimension 4", "dimension 5", "dimension 6"];
 //*HINT: the first dimension is often a label; you can simply remove the first dimension with
 // dimensions.splice(0, 1);
@@ -56,6 +55,13 @@ function init() {
         .attr("width", width)
         .attr("height", height)
         .append("g");
+
+        // Define SVG filter for brushed style
+        scatter.append("defs").append("filter")
+        .attr("id", "blur-filter")
+        .append("feGaussianBlur")
+        .attr("stdDeviation", 0.4);  // adjust blur strength
+
 
     // Create the radar SVG with enough space
     radar = d3.select("#radar").append("svg")
@@ -275,14 +281,13 @@ function CreateDataTable(_data) {
                 .style("background-color", null);
             });
 }
-
-
-
+// Global map to store colors by data point ID
+const colorById = new Map();
 
 function renderScatterplot() {
     if (!data || data.length === 0) return;
 
-    // Get selected visual dimensions from the menus
+    // Get selected dimensions from the dropdown menus
     const xDim = readMenu("scatterX");
     const yDim = readMenu("scatterY");
     const sizeDim = readMenu("size");
@@ -303,17 +308,24 @@ function renderScatterplot() {
     // Update axes
     xAxis.transition().call(d3.axisBottom(x));
     yAxis.transition().call(d3.axisLeft(y));
-
     xAxisLabel.text(xDim);
     yAxisLabel.text(yDim);
+
+    // Color scale and map assignment
+    const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+    data.forEach((d, i) => {
+        if (!colorById.has(d._id)) {
+            colorById.set(d._id, colorScale(i));
+        }
+    });
+
+    const baseColor = "black"; // default color for unselected
 
     // Clear previous circles
     scatter.selectAll("circle").remove();
 
-    // Tooltip div (must exist in your HTML)
     const tooltip = d3.select("#tooltip");
 
-    // Draw circles with interactivity
     scatter.selectAll("circle")
         .data(data)
         .enter()
@@ -321,22 +333,19 @@ function renderScatterplot() {
         .attr("cx", d => x(+d[xDim]))
         .attr("cy", d => y(+d[yDim]))
         .attr("r", d => sizeScale(+d[sizeDim]))
-        .style("fill", "steelblue")
-        .style("opacity", 0.7)
-        .style("stroke", "black")
+        .style("fill", d => selectedIds.has(d._id) ? colorById.get(d._id) : baseColor)
+        .style("fill-opacity", d => selectedIds.has(d._id) ? 1.0 : 0.3)
+        .style("stroke", d => selectedIds.has(d._id) ? colorById.get(d._id) : "#333")
+        .style("stroke-width", d => selectedIds.has(d._id) ? 1.5 : 0.5)
         .style("cursor", "pointer")
         .attr("data-id", d => d._id)
-        .on("click", function(event, d) {
-            if (selectedIds.has(d._id)) {
-                selectedIds.delete(d._id); // Deselect
-                d3.select(this).style("stroke", "black");
-            } else {
-                selectedIds.add(d._id); // Select
-                d3.select(this).style("stroke", "orange");
+        .on("mouseover", function (event, d) {
+            if (!selectedIds.has(d._id)) {
+                d3.select(this)
+                    .style("fill", colorById.get(d._id))
+                    .style("fill-opacity", 0.7);
             }
-            renderRadarChart(); // Update radar
-        })
-        .on("mouseover", function(event, d) {
+
             const html = Object.entries(d)
                 .filter(([k]) => k !== "_id")
                 .map(([key, val]) => `<strong>${key}:</strong> ${val}`)
@@ -346,128 +355,149 @@ function renderScatterplot() {
                 .style("display", "block")
                 .html(html);
         })
-        .on("mousemove", function(event) {
+        .on("mousemove", function (event) {
             tooltip
                 .style("left", (event.pageX + 15) + "px")
                 .style("top", (event.pageY - 20) + "px");
         })
-        .on("mouseout", function() {
+        .on("mouseout", function (event, d) {
+            if (!selectedIds.has(d._id)) {
+                d3.select(this)
+                    .style("fill", baseColor)
+                    .style("fill-opacity", 0.3);
+            }
             tooltip.style("display", "none");
+        })
+        .on("click", function (event, d) {
+            const circle = d3.select(this);
+            if (selectedIds.has(d._id)) {
+                selectedIds.delete(d._id);
+                circle
+                    .style("fill", baseColor)
+                    .style("fill-opacity", 0.3)
+                    .style("stroke", "#333");
+            } else {
+                selectedIds.add(d._id);
+                circle
+                    .style("fill", colorById.get(d._id))
+                    .style("fill-opacity", 1.0)
+                    .style("stroke", colorById.get(d._id));
+            }
+
+            renderRadarChart(); // Update radar on selection change
         });
 }
 
 
-    // TODO: get domain names from menu and label x- and y-axis
+function renderRadarChart() {
+    if (!data || !dimensions || dimensions.length === 0) return;
 
-    // TODO: re-render axes
+    // Clear radar chart and legend
+    radar.selectAll(".radar-line").remove();
+    radar.selectAll(".radar-dot").remove();
+    d3.select("#legend").html("<strong>Legend:</strong>");
 
-    // TODO: render dots
+    // Find label field
+    const allKeys = Object.keys(data[0]);
+    const labelField = allKeys.find(k => !dimensions.includes(k) && k !== "_id");
 
-    function renderRadarChart() {
-        if (!data || !dimensions || dimensions.length === 0) return;
-    
-        // Clear radar chart and legend
-        radar.selectAll(".radar-line").remove();
-        radar.selectAll(".radar-dot").remove();
-        d3.select("#legend").html("<strong>Legend:</strong>");
-    
-        // Find first non-numeric field for legend label
-        const allKeys = Object.keys(data[0]);
-        const labelField = allKeys.find(k => !dimensions.includes(k) && k !== "_id");
-    
-        // Scale each dimension to radius
-        const axisScales = {};
-        dimensions.forEach(dim => {
-            const extent = d3.extent(data, d => +d[dim]);
-            axisScales[dim] = d3.scaleLinear().domain(extent).range([0, radius * 0.85]);
+    // Scales per dimension
+    const axisScales = {};
+    dimensions.forEach(dim => {
+        const extent = d3.extent(data, d => +d[dim]);
+        axisScales[dim] = d3.scaleLinear().domain(extent).range([0, radius * 0.85]);
+    });
+
+    const line = d3.lineRadial()
+        .radius(d => d.value)
+        .angle((d, i) => i * radarAxesAngle)
+        .curve(d3.curveLinearClosed);
+
+    data.forEach((d, i) => {
+        if (!selectedIds.has(d._id)) return;
+
+        const values = dimensions.map((dim, i) => {
+            const raw = d[dim];
+            const num = parseFloat(raw);
+            const scaled = axisScales[dim];
+            return {
+                axis: dim,
+                value: isFinite(num) ? scaled(num) : 0
+            };
         });
-    
-        const color = d3.scaleOrdinal(d3.schemeCategory10);
-        const line = d3.lineRadial()
-            .radius(d => d.value)
-            .angle((d, i) => i * radarAxesAngle)
-            .curve(d3.curveLinearClosed);
-    
-        let colorIndex = 0;
-    
-        data.forEach((d, i) => {
-            if (!selectedIds.has(d._id)) return;
-    
-            const values = dimensions.map((dim, i) => {
-                const raw = d[dim];
-                const num = parseFloat(raw);
-                const scaled = axisScales[dim];
-                return {
-                    axis: dim,
-                    value: isFinite(num) ? scaled(num) : 0  // fallback to 0 if not a valid number
-                };
-            });
-            
-            
-    
-            // Draw polygon
-            radar.append("path")
-                .datum(values)
-                .attr("class", "radar-line radar-id-" + d._id)
-                .attr("d", line)
-                .style("fill", color(colorIndex))
-                .style("fill-opacity", 0.4)
-                .style("stroke", color(colorIndex))
-                .style("stroke-width", 2);
-    
-            // Dots on axes
-            radar.selectAll(".radar-dot-" + d._id)
-                .data(values)
-                .enter()
-                .append("circle")
-                .attr("class", "radar-dot radar-dot-" + d._id)
-                .attr("cx", (v, i) => radarX(v.value, i))
-                .attr("cy", (v, i) => radarY(v.value, i))
-                .attr("r", 3)
-                .style("fill", color(colorIndex));
-    
-            // Legend entry using first column
-            const label = d[labelField] || `Data ${d._id}`;
-            // Create a container for the legend item
+
+        const pointColor = colorById.get(d._id) || "gray";
+
+        // Draw polygon
+        radar.append("path")
+            .datum(values)
+            .attr("class", "radar-line radar-id-" + d._id)
+            .attr("d", line)
+            .style("fill", pointColor)
+            .style("fill-opacity", 0.4)
+            .style("stroke", pointColor)
+            .style("stroke-width", 2);
+
+        // Dots on radar axes
+        radar.selectAll(".radar-dot-" + d._id)
+            .data(values)
+            .enter()
+            .append("circle")
+            .attr("class", "radar-dot radar-dot-" + d._id)
+            .attr("cx", (v, i) => radarX(v.value, i))
+            .attr("cy", (v, i) => radarY(v.value, i))
+            .attr("r", 3)
+            .style("fill", pointColor);
+
+        // Legend item
+        const label = d[labelField] || `Data ${d._id}`;
         const legendItem = d3.select("#legend")
             .append("div")
             .attr("class", "legend-item")
-            .style("color", color(colorIndex))
+            .style("color", pointColor)
             .style("font-weight", "bold")
             .style("margin", "4px 0")
             .style("display", "flex")
             .style("align-items", "center")
             .style("gap", "6px");
 
-        // Label text
+        legendItem.append("span").text(label);
         legendItem.append("span")
-            .text(label);
-
-        // Remove button
-        legendItem.append("span")
-            .html("&times;")  // HTML for ×
+            .html("&times;")
             .style("cursor", "pointer")
             .style("margin-left", "6px")
             .on("click", function () {
-                // Remove radar polygon and dots
-                radar.selectAll(".radar-id-" + d._id).remove();
-                radar.selectAll(".radar-dot-" + d._id).remove();
-                // Remove from selected set and re-render
-                selectedIds.delete(d._id);
-                renderRadarChart();
+        // 1. Remove from selection
+        selectedIds.delete(d._id);
+
+        // 2. Remove radar elements
+        radar.selectAll(".radar-id-" + d._id).remove();
+        radar.selectAll(".radar-dot-" + d._id).remove();
+
+        // 3. Remove this legend item (this = span, parent = div)
+        d3.select(this.parentNode).remove();
+
+        // 4. Update the corresponding scatterplot point
+        scatter.selectAll("circle")
+            .filter(function () {
+                return +d3.select(this).attr("data-id") === d._id;
+            })
+            .transition().duration(300)
+            .style("fill", "black")
+            .style("fill-opacity", 0.3)
+            .style("stroke", "#333")
+            .style("stroke-width", 0.5);
     });
 
-    
-            colorIndex++;
-        });
-    }
-    
-    
+        
+            });
+            
+  
+}
+
     // TODO: show selected items in legend
 
     // TODO: render polylines in a unique color
-
-
 
 function radarX(radius, index){
     return radius * Math.cos(radarAngle(index));
