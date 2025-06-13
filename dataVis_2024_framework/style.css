@@ -18,30 +18,45 @@ body {
 }
 
 /* Style tab links */
+.tab-row {
+    display: flex;
+    width: 100%;
+}
+
 .tablink {
+    flex: 1 1 33.33%;
     background-color: #555;
     color: white;
-    float: left;
-    margin: 0.5px;
     border: none;
     outline: none;
     cursor: pointer;
-    padding: 14px 16px;
+    padding: 14px 0;
     font-size: 17px;
-    width: 33%;
+    text-align: center;
+    transition: background-color 0.3s ease;
 }
 
 .tablink:hover {
     background-color: #777;
 }
 
+/* Wrap buttons in a responsive container */
+.tablink-container {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+
 /* Style the tab content (and add height:100% for full page content) */
 .tabcontent {
     color: black;
     display: none;
-    padding: 100px 20px;
+    padding: 40px 20px 20px 20px; /* top padding reduced */
     height: 100%;
+    box-sizing: border-box;
 }
+
 
 .dataTableClass {
     width: 80%;
@@ -144,3 +159,96 @@ div.tooltip {
     pointer-events: none;
     font-size: .7rem;
 }
+#tooltip {
+    position: absolute;
+    background: white;
+    border: 1px solid #aaa;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 12px;
+    pointer-events: none;
+    display: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    z-index: 9999; /* make sure it's on top of everything */
+    max-width: 250px;
+    word-wrap: break-word;
+}
+
+
+.header-container {
+    padding: 20px;
+    background-color: #f5f5f5;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+@media (max-width: 768px) {
+    .header-container {
+        padding: 15px 10px;
+    }
+
+    .header-container h1 {
+        font-size: 22px;
+    }
+
+    #credits {
+        font-size: 12px;
+    }
+}
+
+.vis-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.vis-block {
+    flex: 1 1 48%;
+    min-width: 300px;
+    padding: 10px;
+    background-color: #fff;
+    box-sizing: border-box;
+    /* remove border */
+    border: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05); /* optional: soft shadow */
+}
+
+
+#radar, #sp {
+    min-height: 500px; /* or match the new height you set */
+}
+
+#legend {
+    margin-top: 20px;
+    border: 1px solid black;
+    padding: 10px;
+}
+
+/* Make responsive for smaller screens */
+@media (max-width: 768px) {
+    .vis-row {
+        flex-direction: column;
+    }
+
+    .vis-block {
+        width: 100%;
+    }
+}
+
+.legend-row {
+    width: 100%;
+    padding: 10px 15px;
+    box-sizing: border-box;
+}
+
+#legend {
+    border: 1px solid black;
+    padding: 10px;
+    background-color: white;
+    min-height: 40px;
+}
+
+

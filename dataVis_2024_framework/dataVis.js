@@ -36,8 +36,8 @@ let scatter, radar, dataTable;
 
 function init() {
     margin = { top: 50, right: 50, bottom: 50, left: 50 };
-    width = 400;
-    height = 400;
+    width = 600;
+    height = 600;
     radius = Math.min(width, height) / 2 - 40;
 
 
@@ -53,17 +53,19 @@ function init() {
 
     // Scatterplot SVG
     scatter = d3.select("#sp").append("svg")
-        .attr("width", width)
-        .attr("height", height)
-        .append("g");
+    .attr("width", "100%") // NEW
+    .attr("height", height)
+    .append("g");
+
 
     // Create the radar SVG with enough space
     radar = d3.select("#radar").append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .style("background", "#fefefe") // optional
-        .append("g")
-        .attr("transform", `translate(${(width + margin.left + margin.right) / 2}, ${(height + margin.top + margin.bottom) / 2})`);
+    .attr("width", "100%") // NEW
+    .attr("height", height + margin.top + margin.bottom)
+    .style("background", "#fefefe")
+    .append("g")
+    .attr("transform", `translate(${(width + margin.left + margin.right) / 2}, ${(height + margin.top + margin.bottom) / 2})`);
+
 
     // File upload handler
     const fileInput = document.getElementById("upload");
@@ -369,7 +371,9 @@ function renderScatterplot() {
         // Clear radar chart and legend
         radar.selectAll(".radar-line").remove();
         radar.selectAll(".radar-dot").remove();
-        d3.select("#legend").html("<strong>Legend:</strong>");
+        const legendContainer = d3.select("#legend");
+        legendContainer.selectAll(".legend-item").remove(); // only remove old items
+
     
         // Find first non-numeric field for legend label
         const allKeys = Object.keys(data[0]);

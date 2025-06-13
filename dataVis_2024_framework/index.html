@@ -35,19 +35,25 @@
 <!-- call init function when page has loaded -->
 <body onload="init()">
 
-<h1>Data Visualization Exercise</h1>
-
-<!-- credits -->
-<div id="credits">
-    Created by <span class="instructions">ANNA ROSE JOSHY & DIVYA SABU</span>
-    for the Data Visualization Lecture at <a href="https://www.fim.uni-passau.de/digitale-bildverarbeitung"> Faculty of Computer
-    Science and Mathematics - Chair of Cognitive sensor systems - University of Passau</a>.
+<div class="header-container">
+    <h1>Data Visualization Exercise</h1>
+    <div id="credits">
+        Created by <span class="instructions">ANNA ROSE JOSHY & DIVYA SABU</span>
+        for the Data Visualization Lecture at
+        <a href="https://www.fim.uni-passau.de/digitale-bildverarbeitung">
+            Faculty of Computer Science and Mathematics - Chair of Cognitive sensor systems - University of Passau
+        </a>.
+    </div>
 </div>
 
+
 <!-- create buttons to select tabs -->
-<button class="tablink" onclick="openPage('DataLoading', this, 'blue')" id="defaultOpen" >Data Loading</button>
-<button class="tablink" onclick="openPage('BasicVisualization', this, 'blue')">Basic Visualization</button>
-<button class="tablink" onclick="openPage('Dashboard', this, 'blue')">Dashboard</button>
+<!-- create buttons to select tabs -->
+<div class="tab-row">
+    <button class="tablink" onclick="openPage('DataLoading', this, 'blue')" id="defaultOpen">Data Loading</button>
+    <button class="tablink" onclick="openPage('BasicVisualization', this, 'blue')">Basic Visualization</button>
+    <button class="tablink" onclick="openPage('Dashboard', this, 'blue')">Dashboard</button>
+</div>
 
 <!-- Tab 1 -->
 <div id="DataLoading" class="tabcontent">
@@ -62,53 +68,41 @@
 
 <!-- Tab 2 -->
 <div id="BasicVisualization" class="tabcontent">
-
-    <!-- scatterplot -->
-    <div class="container">
-        <!-- scatterplot menu -->
-        <h2>Scatterplot</h2>
-
-        <p>Select dimensions to be displayed here: </p>
-        <div id="menu">
-            <form action="#">
-                <fieldset>
-                    <label for="scatterX">x axis: </label>
-                    <select name="scatterX" id="scatterX">
-                    </select>
-                    <br/>
-                    <label for="scatterY">y axis: </label>
-                    <select name="scatterY" id="scatterY">
-                    </select>
-                    <br/>
-                    <label for="size">size: </label>
-                    <select name="size" id="size">
-                    </select>
-                </fieldset>
-            </form>
+    <div class="vis-row">
+        <!-- Scatterplot Section -->
+        <div class="vis-block">
+            <h2>Scatterplot</h2>
+            <p>Select dimensions to be displayed here:</p>
+            <div id="menu">
+                <form action="#">
+                    <fieldset>
+                        <label for="scatterX">x axis: </label>
+                        <select name="scatterX" id="scatterX"></select><br/>
+                        <label for="scatterY">y axis: </label>
+                        <select name="scatterY" id="scatterY"></select><br/>
+                        <label for="size">size: </label>
+                        <select name="size" id="size"></select>
+                    </fieldset>
+                </form>
+            </div>
+            <div id="sp"></div>
         </div>
-        <!-- scatterplot SVG -->
-        <div id="sp"></div>
-        <div id="tooltip" style="
-        position: absolute;
-        background: white;
-        border: 1px solid #aaa;
-        border-radius: 4px;
-        padding: 8px;
-        font-size: 12px;
-        pointer-events: none;
-        display: none;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-        z-index: 10;"></div>
 
+        <!-- Radar Chart Section -->
+        <div class="vis-block">
+            <h2>Radar Chart</h2>
+            <div id="radar"></div>
+            
+        </div>
     </div>
+    <!-- Legend in full-width row -->
+<div class="legend-row">
+    <div id="legend"><strong>Legend:</strong></div>
+</div>
 
-    <!-- radar chart -->
-    <div class="container">
-        <h2>Radar Chart</h2>
-        <!-- radar chart SVG -->
-        <div id="radar"></div>
-        <div id="legend" style="margin-top: 20px;"><strong>Legend:</strong></div>
-    </div>
+
+    <div id="tooltip"></div>
+</div>
 
 </div>
 
