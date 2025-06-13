@@ -319,13 +319,13 @@ function renderScatterplot() {
     xAxisLabel.text(xDim);
     yAxisLabel.text(yDim);
 
-    // Color scale and map assignment
+   /* // Color scale and map assignment
     const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
     data.forEach((d, i) => {
         if (!colorById.has(d._id)) {
             colorById.set(d._id, colorScale(i));
         }
-    });
+    });*/
 
     const baseColor = "black"; // default color for unselected
 
@@ -539,6 +539,12 @@ function renderRadarChart() {
                 .style("margin-left", "6px")
                 .on("click", function () {
                     selectedIds.delete(d._id);
+                    const releasedColor = colorById.get(d._id);
+                    if (releasedColor && !colorPool.includes(releasedColor)) {
+                        colorPool.push(releasedColor);
+                    }
+                    colorById.delete(d._id);
+
 
                     radar.selectAll(".radar-id-" + d._id)
                         .transition().duration(400).style("opacity", 0).remove();
