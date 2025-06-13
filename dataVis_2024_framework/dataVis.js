@@ -35,11 +35,11 @@ let scatter, radar, dataTable;
 
 
 function init() {
-    // Define margins and sizes
-    margin = { top: 100, right: 100, bottom: 100, left: 100 };
-    width = 700;
-    height = 700;
-    radius = Math.min(width, height) / 2 - 100;
+    margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    width = 400;
+    height = 400;
+    radius = Math.min(width, height) / 2 - 40;
+
 
     // Start default tab
     document.getElementById("defaultOpen").click();
@@ -428,12 +428,35 @@ function renderScatterplot() {
     
             // Legend entry using first column
             const label = d[labelField] || `Data ${d._id}`;
-            d3.select("#legend")
-                .append("div")
-                .style("color", color(colorIndex))
-                .style("font-weight", "bold")
-                .style("margin", "4px 0")
-                .text(label);
+            // Create a container for the legend item
+        const legendItem = d3.select("#legend")
+            .append("div")
+            .attr("class", "legend-item")
+            .style("color", color(colorIndex))
+            .style("font-weight", "bold")
+            .style("margin", "4px 0")
+            .style("display", "flex")
+            .style("align-items", "center")
+            .style("gap", "6px");
+
+        // Label text
+        legendItem.append("span")
+            .text(label);
+
+        // Remove button
+        legendItem.append("span")
+            .html("&times;")  // HTML for ×
+            .style("cursor", "pointer")
+            .style("margin-left", "6px")
+            .on("click", function () {
+                // Remove radar polygon and dots
+                radar.selectAll(".radar-id-" + d._id).remove();
+                radar.selectAll(".radar-dot-" + d._id).remove();
+                // Remove from selected set and re-render
+                selectedIds.delete(d._id);
+                renderRadarChart();
+    });
+
     
             colorIndex++;
         });
