@@ -302,8 +302,8 @@ function renderScatterplot() {
         .range([4, 12]);
 
     // Update axes
-    xAxis.transition().call(d3.axisBottom(x));
-    yAxis.transition().call(d3.axisLeft(y));
+    xAxis.transition().duration(600).call(d3.axisBottom(x));
+    yAxis.transition().duration(600).call(d3.axisLeft(y));
     xAxisLabel.text(xDim);
     yAxisLabel.text(yDim);
 
@@ -317,18 +317,17 @@ function renderScatterplot() {
 
     const baseColor = "black"; // default color for unselected
 
-    // Clear previous circles
-    scatter.selectAll("circle").remove();
-
     const tooltip = d3.select("#tooltip");
 
-    scatter.selectAll("circle")
-        .data(data)
-        .enter()
+    const circles = scatter.selectAll("circle")
+        .data(data, d => d._id);
+
+    // ENTER
+    circles.enter()
         .append("circle")
         .attr("cx", d => x(+d[xDim]))
         .attr("cy", d => y(+d[yDim]))
-        .attr("r", d => sizeScale(+d[sizeDim]))
+        .attr("r", 0)
         .style("fill", d => selectedIds.has(d._id) ? colorById.get(d._id) : baseColor)
         .style("fill-opacity", d => selectedIds.has(d._id) ? 1.0 : 0.3)
         .style("stroke", d => selectedIds.has(d._id) ? colorById.get(d._id) : "#333")
@@ -381,8 +380,30 @@ function renderScatterplot() {
             }
 
             renderRadarChart(); // Update radar on selection change
-        });
+        })
+        .transition()
+        .duration(600)
+        .attr("r", d => sizeScale(+d[sizeDim]));
+
+    // UPDATE
+    circles.transition()
+        .duration(600)
+        .attr("cx", d => x(+d[xDim]))
+        .attr("cy", d => y(+d[yDim]))
+        .attr("r", d => sizeScale(+d[sizeDim]))
+        .style("fill", d => selectedIds.has(d._id) ? colorById.get(d._id) : baseColor)
+        .style("fill-opacity", d => selectedIds.has(d._id) ? 1.0 : 0.3)
+        .style("stroke", d => selectedIds.has(d._id) ? colorById.get(d._id) : "#333")
+        .style("stroke-width", d => selectedIds.has(d._id) ? 1.5 : 0.5);
+
+    // EXIT
+    circles.exit()
+        .transition()
+        .duration(300)
+        .attr("r", 0)
+        .remove();
 }
+
 
 function renderRadarChart() {
     if (!data || !dimensions || dimensions.length === 0) return;
