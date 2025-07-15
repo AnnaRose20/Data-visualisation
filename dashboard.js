@@ -9,70 +9,58 @@
 * All rights reserved.
 */
 
-// TODO: File for Part 2
-// TODO: You can edit this file as you wish - add new methods, variables etc. or change/delete existing ones.
-
-// TODO: use descriptive names for variables
 let chart1, chart2, chart3, chart4;
+let dashboardData;
+const width = 400;
+const height = 300;
 
 function initDashboard(_data) {
+    if (!_data || !_data.length) return;
 
-    // TODO: Initialize the environment (SVG, etc.) and call the nedded methods
+    dashboardData = _data;
 
-    //  SVG container
+    // Clear old charts
+    d3.selectAll("#chart1 > *").remove();
+    d3.selectAll("#chart2 > *").remove();
+    d3.selectAll("#chart3 > *").remove();
+    d3.selectAll("#chart4 > *").remove();
+
     chart1 = d3.select("#chart1").append("svg")
         .attr("width", width)
         .attr("height", height)
         .append("g");
 
-    //  SVG container
     chart2 = d3.select("#chart2").append("svg")
         .attr("width", width)
         .attr("height", height)
         .append("g");
 
-
-    //  SVG container
     chart3 = d3.select("#chart3").append("svg")
         .attr("width", width)
         .attr("height", height)
         .append("g");
 
-
-    //  SVG container
     chart4 = d3.select("#chart4").append("svg")
         .attr("width", width)
         .attr("height", height)
         .append("g");
 
-
-    createChart1();
-    createChart2();
-    createChart3();
-    createChart4();
+    createChart1(dashboardData);
+    createChart2(dashboardData);
+    createChart3(dashboardData);
+    createChart4(dashboardData);
 }
 
-function createChart1(){
+function detectColumnTypes(data) {
+    const keys = Object.keys(data[0]);
+    const numerical = [];
+    const categorical = [];
 
-}
+    keys.forEach(k => {
+        const values = data.map(d => d[k]);
+        const isNumeric = values.every(v => !isNaN(parseFloat(v)) && isFinite(v));
+        (isNumeric ? numerical : categorical).push(k);
+    });
 
-function createChart2(){
-
-}
-
-function createChart3(){
-
-}
-
-function createChart4(){
-
-}
-
-// clear files if changes (dataset) occur
-function clearDashboard() {
-
-    chart1.selectAll("*").remove();
-    chart2.selectAll("*").remove();
-    chart3.selectAll("*").remove();
-    chart4.selectAll("*").remove();
+    return { numerical, categorical };
 }

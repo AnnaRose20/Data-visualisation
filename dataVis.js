@@ -83,7 +83,7 @@ function init() {
 
             initVis(data);         // render visuals
             CreateDataTable(data);
-            initDashboard?.(null); // safe optional call
+            initDashboard?.(data); // safe optional call
         };
         reader.readAsBinaryString(fileInput.files[0]);
     };
