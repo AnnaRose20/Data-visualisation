@@ -91,8 +91,26 @@ svg {
 
 .dashboardGrid {
     display: grid;
-    grid-template-columns: auto auto;
-    grid-gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 24px;
+    margin: 24px 0;
+}
+
+@media (max-width: 900px) {
+    .dashboardGrid {
+        grid-template-columns: 1fr;
+    }
+    .vis-block {
+        margin-bottom: 24px;
+    }
+}
+
+/* Optional: Make vis-blocks look nice */
+.vis-block {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
 .axis line,
