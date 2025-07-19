@@ -27,6 +27,7 @@ window.initDashboard = function(_data) {
 
     // === PARALLEL COORDS AXIS DROPDOWNS (multi-select) ===
     fillMultiDropdown("#parcoordsAxes", numerical, numerical.slice(0, 5));
+    fillParcoordsCheckboxes(numerical, numerical.slice(0, 5));
 
     // === SPLOM DROPDOWNS ===
     //fillDropdown("#splomX", numerical);
@@ -97,25 +98,49 @@ function fillMultiDropdown(sel, values, selected=[]) {
         .attr("selected", d => selected.includes(d) ? "selected" : null)
         .text(d => d);
 }
+function fillParcoordsCheckboxes(numerical, selected=[]) {
+    const container = d3.select("#parcoordsAxesCheckboxes");
+    container.selectAll("*").remove();
+    numerical.forEach(axis => {
+        const label = container.append("label").style("margin-right", "15px");
+        label.append("input")
+            .attr("type", "checkbox")
+            .attr("value", axis)
+            .property("checked", selected.includes(axis))
+            .on("change", () => createChart1(dashData));
+        label.append("span").text(axis);
+    });
+}
+
 
 //////////////////////////////////////
 // 1. PARALLEL COORDINATES PLOT    //
 //////////////////////////////////////
 function createChart1(data) {
     d3.select("#chart1").selectAll("*").remove();
-    let axes = Array.from(d3.select("#parcoordsAxes").property("selectedOptions"), opt => opt.value);
+
+    // Read checked axes
+    let axes = [];
+    d3.selectAll("#parcoordsAxesCheckboxes input[type='checkbox']").each(function() {
+        if (d3.select(this).property("checked")) axes.push(this.value);
+    });
+
     if (!axes || axes.length < 2) {
         d3.select("#chart1").append("div").text("Select two or more numeric columns!");
         return;
     }
-    const margin = {top: 30, right: 10, bottom: 20, left: 10},
-        w = width - margin.left - margin.right,
-        h = height - margin.top - margin.bottom;
+
+    // Larger dimensions!
+    const width = 1000, height = 800;
+    const margin = {top: 40, right: 40, bottom: 40, left: -10},
+          w = width - margin.left - margin.right,
+          h = height - margin.top - margin.bottom;
 
     const svg = d3.select("#chart1")
         .append("svg")
         .attr("width", width)
         .attr("height", height);
+
     const g = svg.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -126,6 +151,7 @@ function createChart1(data) {
             .domain(d3.extent(data, d => +d[axis]))
             .range([h, 0]);
     });
+
     // X scale for axes
     const x = d3.scalePoint()
         .range([0, w])
@@ -155,9 +181,12 @@ function createChart1(data) {
     axisG.append("text")
         .style("text-anchor", "middle")
         .attr("y", -9)
-        .text(d => d)
-        .attr("fill", "#000");
+        .attr("fill", "#000")
+        .attr("font-weight", "bold")
+        .attr("font-size", "14px")
+        .text(d => d);
 }
+
 
 //////////////////////////////////////
 // 2. SCATTERPLOT MATRIX (SPLOM)   //
@@ -179,7 +208,7 @@ function createChart2(data) {
 
     // --- Layout
     const n = numerical.length;
-    const maxCanvas = 900;
+    const maxCanvas = 700;
     const size = Math.max(70, Math.min(110, Math.floor(maxCanvas / n))); // not too tiny
 
     const padding = 18;
@@ -523,6 +552,7 @@ function createChart3(data) {
     drawSunburst();
     d3.selectAll("#chart3-controls select").on("change", drawSunburst);
 }
+
 
 //////////////////////////////////////
 // 4. BOX PLOT BY GROUP            //

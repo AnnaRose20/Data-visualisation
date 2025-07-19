@@ -283,5 +283,10 @@ div.tooltip {
 #chart1, #chart2, #chart3, #chart4 {
     min-height: 300px;
     position: relative;
+    overflow-x: auto;
+    max-width: 100vw;
+    min-width: 0;
+    width: 100%;
+    
 }
 
