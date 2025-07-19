@@ -106,31 +106,52 @@
 
 </div>
 
+
 <!-- Tab 3: Dashboard -->
 <div id="Dashboard" class="tabcontent">
     <h1 class="zzz">Zzz<span class="metrics">Metrics...</span></h1>
 
     <div class="dashboardGrid">
 
+        <!-- Parallel Coordinates Plot -->
         <div class="vis-block">
-            <h2>Sunburst Chart</h2>
+            <h2>Parallel Coordinates</h2>
+            <label for="parcoordsAxes">Axes (choose ≥2):</label>
+            <select id="parcoordsAxes" multiple style="min-width:120px"></select>
             <div id="chart1"></div>
         </div>
 
-        <div class="vis-block">
-            <h2>Bar Chart</h2>
-            <div id="chart2"></div>
-        </div>
-
+        <!-- Scatterplot -->
         <div class="vis-block">
             <h2>Scatterplot</h2>
-            <div id="chart3"></div>
+            <label for="splomColor">Color by:</label>
+            <select id="splomColor"></select>
+            <div id="chart2" style="overflow:auto; max-width:100%; max-height:80vh;"></div>
         </div>
 
+        <!-- Sunburst Chart (Multi-level) -->
         <div class="vis-block">
-            <h2>Heatmap</h2>
+            <h2>Sunburst Chart</h2>
+            <div id="chart3-controls"></div>
+            <div id="chart3"></div>
+        </div>
+        
+        
+
+        <!-- Box Plot by Group -->
+        <div class="vis-block">
+            <h2>Box Plot</h2>
+            <label for="boxNum">Numeric:</label>
+            <select id="boxNum"></select>
+            <label for="boxCat">Group by:</label>
+            <select id="boxCat"></select>
             <div id="chart4"></div>
         </div>
+
+    </div>
+</div>
+
+        
 
     </div>
 </div>
