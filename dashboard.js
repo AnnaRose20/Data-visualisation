@@ -131,18 +131,25 @@ function createChart1(data) {
     }
 
     // Larger dimensions!
-    const width = 1000, height = 800;
-    const margin = {top: 40, right: 40, bottom: 40, left: -10},
-          w = width - margin.left - margin.right,
-          h = height - margin.top - margin.bottom;
+    const container = document.getElementById('chart1');
+    const width = container.clientWidth || 800;   // fallback to 800 if needed
+    const height = Math.round(width * 0.7);       // aspect ratio, can adjust
+
+    const margin = {top: 40, right: 40, bottom: 40, left: 40};
+    const w = width - margin.left - margin.right;
+    const h = height - margin.top - margin.bottom;
+
 
     const svg = d3.select("#chart1")
         .append("svg")
-        .attr("width", width)
-        .attr("height", height);
+        .attr("width", "100%")    // let SVG fill the div
+        .attr("height", height)
+        .attr("viewBox", `0 0 ${width} ${height}`);  // scales all drawing commands
+
 
     const g = svg.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
+
 
     // Y scale per axis
     const y = {};
@@ -178,13 +185,18 @@ function createChart1(data) {
         .each(function(d) { d3.select(this).call(d3.axisLeft(y[d])); });
 
     // Axis labels
+    const fontSize = Math.max(7, Math.min(10, Math.floor(w / axes.length / 4)));
+
     axisG.append("text")
-        .style("text-anchor", "middle")
-        .attr("y", -9)
+        .attr("y", -10)
         .attr("fill", "#000")
         .attr("font-weight", "bold")
-        .attr("font-size", "14px")
+        .attr("font-size", fontSize)
+        .attr("text-anchor", axes.length > 7 ? "end" : "middle")
+        .attr("transform", axes.length > 7 ? "rotate(-40)" : null)
         .text(d => d);
+
+
 }
 
 
@@ -199,7 +211,9 @@ function createChart2(data) {
         d3.select("#chart2").append("div").text("Not enough numeric columns!");
         return;
     }
-    
+    const container = document.getElementById('chart2');
+    const width = container.clientWidth || 700;
+
     const colorBy = d3.select("#splomColor").property("value") || categorical[0];
     const colorValues = Array.from(new Set(data.map(d => d[colorBy])));
     const colorScale = d3.scaleOrdinal()
@@ -208,17 +222,20 @@ function createChart2(data) {
 
     // --- Layout
     const n = numerical.length;
-    const maxCanvas = 700;
-    const size = Math.max(70, Math.min(110, Math.floor(maxCanvas / n))); // not too tiny
-
     const padding = 18;
     const legendBoxSize = 22;
     const legendWidth = 130;
 
+    // Figure out how much space is left for each cell:
+    const matrixWidth = width - legendWidth - padding * 3;
+    const size = Math.max(50, Math.min(110, Math.floor(matrixWidth / n))); // adjust as needed
+    const height = size * n + padding * 3;
+
     const svg = d3.select("#chart2")
-        .append("svg")
-        .attr("width", size * n + padding * 3 + legendWidth)
-        .attr("height", size * n + padding * 3);
+    .append("svg")
+    .attr("width", "100%")
+    .attr("height", height)
+    .attr("viewBox", `0 0 ${width} ${height}`);
 
     // Scales for each variable
     const scales = {};
