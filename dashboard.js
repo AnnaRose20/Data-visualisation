@@ -119,31 +119,40 @@ function fillParcoordsCheckboxes(numerical, selected=[]) {
 function createChart1(data) {
     d3.select("#chart1").selectAll("*").remove();
 
+    // Find active axes
     let axes = [];
     d3.selectAll("#parcoordsAxesCheckboxes input[type='checkbox']").each(function() {
         if (d3.select(this).property("checked")) axes.push(this.value);
     });
-
     if (!axes || axes.length < 2) {
         d3.select("#chart1").append("div").text("Select two or more numeric columns!");
         return;
     }
 
-    // 1. Use *all* available container width and max height
-    // Use parent .vis-block or .dashboardGrid (whichever wraps your chart)
+    // Size
     const parent = document.getElementById('chart1').parentElement;
-    const width = parent.clientWidth || 800; // fallback
-
-    const height = Math.round(width * 0.65); // less tall, still roomy
-
-    // 2. Set super slim margins to use *all* space
+    const width = parent.clientWidth || 800;
+    const height = Math.round(width * 0.65);
     const margin = {top: 100, right: 38, bottom: 60, left: 38};
-
-
     const w = width - margin.left - margin.right;
     const h = height - margin.top - margin.bottom;
 
-    // 3. SVG uses 100% width, matches parent size
+    // Scales
+    const y = {};
+    axes.forEach(axis => {
+        y[axis] = d3.scaleLinear()
+            .domain(d3.extent(data, d => +d[axis]))
+            .range([h, 0]);
+    });
+    const x = d3.scalePoint()
+        .range([0, w])
+        .padding(1)
+        .domain(axes);
+
+    // Brush extents per axis (null: unbrushed)
+    const brushes = {};
+
+    // SVG
     const svg = d3.select("#chart1")
         .append("svg")
         .attr("width", "100%")
@@ -153,34 +162,55 @@ function createChart1(data) {
     const g = svg.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Y scale per axis
-    const y = {};
-    axes.forEach(axis => {
-        y[axis] = d3.scaleLinear()
-            .domain(d3.extent(data, d => +d[axis]))
-            .range([h, 0]);
-    });
+    // Polyline generator
+    function path(d) {
+        return d3.line()(axes.map(p => [x(p), y[p](d[p])]));
+    }
 
-    // X scale: spans absolutely all available space
-    const x = d3.scalePoint()
-        .range([0, w])
-        .padding(1)
-        .domain(axes);
-
-    g.append("g")
+    // Foreground lines
+    const lines = g.append("g")
         .attr("class", "foreground")
         .selectAll("path")
         .data(data)
         .join("path")
-        .attr("d", d => d3.line()(axes.map(p => [x(p), y[p](d[p])])))
+        .attr("d", path)
         .attr("stroke", "#1f77b4")
         .attr("fill", "none")
-        .attr("opacity", 0.3);
+        .attr("opacity", 0.3)
+        .attr("class", "parcoord-line")
+        .on("mouseover", function(event, d) {
+            d3.selectAll(".parcoord-line").attr("stroke", "#bbb").attr("opacity", 0.1);
+            d3.select(this).attr("stroke", "#d62728").attr("opacity", 1).raise();
 
-    // Dynamic label size: as big as possible but never too big/small
-    const fontSize = 12;
+            // Optional: tooltip (show individual id or all axis values)
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "parcoords-tooltip")
+                .style("position", "absolute")
+                .style("background", "#fff")
+                .style("border", "1px solid #aaa")
+                .style("padding", "6px 10px")
+                .style("border-radius", "6px")
+                .style("box-shadow", "0 2px 8px rgba(0,0,0,0.13)")
+                .style("pointer-events", "none")
+                .style("font-size", "12px")
+                .html(
+                    Object.entries(d).map(([k, v]) => `<strong>${k}:</strong> ${v}`).join("<br>")
+                )
+                .style("left", (event.pageX + 14) + "px")
+                .style("top", (event.pageY - 40) + "px")
+                .style("visibility", "visible");
+        })
+        .on("mousemove", function(event) {
+            d3.select(".parcoords-tooltip")
+                .style("left", (event.pageX + 14) + "px")
+                .style("top", (event.pageY - 40) + "px");
+        })
+        .on("mouseout", function() {
+            d3.selectAll(".parcoord-line").attr("stroke", "#1f77b4").attr("opacity", 0.3);
+            d3.select(".parcoords-tooltip").remove();
+        });
 
-
+    // Axes
     const axisG = g.selectAll(".axis")
         .data(axes)
         .join("g")
@@ -188,18 +218,50 @@ function createChart1(data) {
         .attr("transform", d => `translate(${x(d)})`)
         .each(function(d) { d3.select(this).call(d3.axisLeft(y[d])); });
 
-    const tiltLabels = true; // set to false if you want to disable tilt
-
+    // Axis labels
     axisG.append("text")
         .attr("y", -4)
         .attr("fill", "#000")
         .attr("font-weight", "bold")
-        .attr("font-size", fontSize)
+        .attr("font-size", 12)
         .attr("text-anchor", "end")
         .attr("transform", "rotate(45)")
         .text(d => d);
 
+    // Brushing: one axis at a time
+    axisG.append("g")
+        .attr("class", "brush")
+        .each(function(axis) {
+            d3.select(this).call(
+                d3.brushY()
+                    .extent([[-10, 0], [10, h]])
+                    .on("brush end", ({selection}) => {
+                        if (selection) {
+                            // Update this axis's brush
+                            const [y0, y1] = selection;
+                            brushes[axis] = [
+                                y[axis].invert(y1),
+                                y[axis].invert(y0)
+                            ];
+                        } else {
+                            brushes[axis] = null;
+                        }
+                        updateLines();
+                    })
+            );
+        });
 
+    // Filtering lines based on brushes
+    function updateLines() {
+        lines.attr("display", d => {
+            return axes.every(axis =>
+                !brushes[axis] || (
+                    d[axis] >= Math.min(...brushes[axis]) &&
+                    d[axis] <= Math.max(...brushes[axis])
+                )
+            ) ? null : "none";
+        });
+    }
 }
 
 //////////////////////////////////////
@@ -207,6 +269,8 @@ function createChart1(data) {
 //////////////////////////////////////
 function createChart2(data) {
     d3.select("#chart2").selectAll("*").remove();
+    d3.select("#splom-modal").remove();
+
     const { numerical, categorical } = detectColumnTypes(data);
 
     if (numerical.length < 2) {
@@ -216,14 +280,7 @@ function createChart2(data) {
 
     const container = document.getElementById('chart2');
     const width = container.clientWidth || 900;
-
-    // Padding and sizing tweaks
-    const containerPad = 48;
-    const topPad = 38;
-    const labelPad = 30;
-    const padding = 14;
-    const legendBoxSize = 18;
-    const legendWidth = 110;
+    const containerPad = 48, topPad = 38, labelPad = 30, padding = 14, legendBoxSize = 18, legendWidth = 110;
     const n = numerical.length;
     const matrixWidth = width - legendWidth - padding * 3 - labelPad - containerPad;
     const size = Math.max(44, Math.min(90, Math.floor(matrixWidth / n)));
@@ -236,13 +293,7 @@ function createChart2(data) {
         .domain(colorValues)
         .range(d3.schemeCategory10);
 
-    const svg = d3.select("#chart2")
-        .append("svg")
-        .attr("width", "100%")
-        .attr("height", height)
-        .attr("viewBox", `0 0 ${width} ${height}`);
-
-    // Scales
+    // One scale per variable
     const scales = {};
     numerical.forEach(attr => {
         scales[attr] = d3.scaleLinear()
@@ -251,59 +302,75 @@ function createChart2(data) {
             .range([padding, size - padding]);
     });
 
-    // SPLOM grid
+    const svg = d3.select("#chart2")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", height)
+        .attr("viewBox", `0 0 ${width} ${height}`);
+
     for (let row = 0; row < n; ++row) {
         for (let col = 0; col < n; ++col) {
             const cell = svg.append("g")
                 .attr("transform", `translate(${col * size + padding*2 + gridOriginX},${row * size + padding*2 + topPad})`);
 
-            // Only draw grid lines and points for off-diagonal cells
             if (row !== col) {
-                // Grid lines
-                const xTicks = scales[numerical[col]].ticks(5);
-                const yTicks = scales[numerical[row]].ticks(5);
+                const xAttr = numerical[col];
+                const yAttr = numerical[row];
+                const xScale = scales[xAttr];
+                const yScale = scales[yAttr];
 
+                // Grid lines
                 cell.selectAll("grid-x")
-                    .data(xTicks)
+                    .data(xScale.ticks(5))
                     .enter()
                     .append("line")
-                    .attr("x1", d => scales[numerical[col]](d))
-                    .attr("x2", d => scales[numerical[col]](d))
+                    .attr("x1", d => xScale(d))
+                    .attr("x2", d => xScale(d))
                     .attr("y1", padding)
                     .attr("y2", size - padding)
                     .attr("stroke", "#dddddd")
                     .attr("stroke-width", 1);
 
                 cell.selectAll("grid-y")
-                    .data(yTicks)
+                    .data(yScale.ticks(5))
                     .enter()
                     .append("line")
-                    .attr("y1", d => scales[numerical[row]](d))
-                    .attr("y2", d => scales[numerical[row]](d))
+                    .attr("y1", d => yScale(d))
+                    .attr("y2", d => yScale(d))
                     .attr("x1", padding)
                     .attr("x2", size - padding)
                     .attr("stroke", "#dddddd")
                     .attr("stroke-width", 1);
 
-                // Data points
+                // Points
                 cell.selectAll("circle")
                     .data(data)
                     .join("circle")
-                    .attr("cx", d => scales[numerical[col]](+d[numerical[col]]))
-                    .attr("cy", d => scales[numerical[row]](+d[numerical[row]]))
+                    .attr("cx", d => xScale(+d[xAttr]))
+                    .attr("cy", d => yScale(+d[yAttr]))
                     .attr("r", 3)
                     .attr("fill", d => colorScale(d[colorBy]))
                     .attr("opacity", 0.7);
+
+                // Click to modal: pass variable names!
+                cell.append("rect")
+                    .attr("class", "splom-cell-cover")
+                    .attr("x", 0)
+                    .attr("y", 0)
+                    .attr("width", size)
+                    .attr("height", size)
+                    .attr("fill", "transparent")
+                    .style("cursor", "pointer")
+                    .on("click", () => showModal(xAttr, yAttr, colorBy, scales[xAttr].domain(), scales[yAttr].domain()));
             } else {
-                // Diagonal: attribute label (split across lines if needed)
+                // Diagonal: attribute label
                 const label = numerical[row];
                 const split = label.split(" ");
                 const textElem = cell.append("text")
                     .attr("x", size / 2)
-                    .attr("y", size / 2 - (split.length > 1 ? 10 : -2)) // Move a bit lower (less negative)
+                    .attr("y", size / 2 - (split.length > 1 ? 10 : -2))
                     .attr("text-anchor", "middle")
-                    .attr("font-size", 13)
-                    .style("font-size", "13px"); // Not bold!
+                    .attr("font-size", 13);
                 split.forEach((line, i) => {
                     textElem.append("tspan")
                         .attr("x", size / 2)
@@ -312,7 +379,7 @@ function createChart2(data) {
                 });
             }
 
-            // X axis attribute label (top row), split if needed
+            // X axis label (top row)
             if (row === 0) {
                 const label = numerical[col];
                 const split = label.split(" ");
@@ -330,7 +397,7 @@ function createChart2(data) {
                 });
             }
 
-            // Y axis attribute label (left col), split if needed
+            // Y axis label (left col)
             if (col === 0) {
                 const label = numerical[row];
                 const split = label.split(" ");
@@ -360,7 +427,7 @@ function createChart2(data) {
         }
     }
 
-    // Legend at right (tight to plot)
+    // Legend at right
     const legend = svg.append("g")
         .attr("transform", `translate(${size * n + padding*2 + gridOriginX + 10},${padding*2 + topPad})`);
     legend.selectAll("legendEntry")
@@ -387,8 +454,103 @@ function createChart2(data) {
         .attr("font-weight", "bold")
         .attr("font-size", "13px")
         .text(colorBy);
-}
 
+    // ---- MODAL logic ----
+    function showModal(xField, yField, colorField, xDomain, yDomain) {
+        d3.select("#splom-modal").remove();
+
+        const modal = d3.select("body").append("div")
+            .attr("id", "splom-modal");
+
+        modal.append("div")
+            .attr("id", "splom-modal-close")
+            .html("&times;")
+            .on("click", () => d3.select("#splom-modal").remove());
+
+        const modalWidth = 680, modalHeight = 600, pad = 54;
+        // Use the same domain as the small plot!
+        const mx = d3.scaleLinear()
+            .domain(xDomain)
+            .range([pad, modalWidth - pad]);
+        const my = d3.scaleLinear()
+            .domain(yDomain)
+            .range([modalHeight - pad, pad]);
+
+        const msvg = modal.append("svg")
+            .attr("width", modalWidth)
+            .attr("height", modalHeight);
+
+        // X axis
+        msvg.append("g")
+            .attr("transform", `translate(0,${modalHeight - pad})`)
+            .call(d3.axisBottom(mx).ticks(8))
+            .append("text")
+            .attr("x", modalWidth / 2)
+            .attr("y", 45)
+            .attr("fill", "#000")
+            .attr("font-weight", "bold")
+            .attr("font-size", "18px")
+            .attr("text-anchor", "middle")
+            .text(xField);
+
+        // Y axis
+        msvg.append("g")
+            .attr("transform", `translate(${pad},0)`)
+            .call(d3.axisLeft(my).ticks(8))
+            .append("text")
+            .attr("x", -modalHeight/2)
+            .attr("y", -36)
+            .attr("transform", "rotate(-90)")
+            .attr("fill", "#000")
+            .attr("font-weight", "bold")
+            .attr("font-size", "18px")
+            .attr("text-anchor", "middle")
+            .text(yField);
+
+        // Points
+        msvg.append("g")
+            .selectAll("circle")
+            .data(data)
+            .join("circle")
+            .attr("cx", d => mx(+d[xField]))
+            .attr("cy", d => my(+d[yField]))
+            .attr("r", 5)
+            .attr("fill", d => colorScale(d[colorField]))
+            .attr("opacity", 0.78);
+
+        // Title
+        msvg.append("text")
+            .attr("x", modalWidth/2)
+            .attr("y", 32)
+            .attr("text-anchor", "middle")
+            .attr("font-size", 24)
+            .attr("font-weight", "bold")
+            .text(`${yField} vs ${xField}`);
+
+        // Legend
+        const legendX = modalWidth - 140, legendY = 40;
+        const modalLegend = msvg.append("g")
+            .attr("transform", `translate(${legendX},${legendY})`);
+        modalLegend.selectAll("legendEntry")
+            .data(colorValues)
+            .enter()
+            .append("g")
+            .attr("transform", (d, i) => `translate(0,${i * 26})`)
+            .each(function(d, i) {
+                d3.select(this).append("rect")
+                    .attr("x", 0)
+                    .attr("y", 0)
+                    .attr("width", 16)
+                    .attr("height", 16)
+                    .attr("fill", colorScale(d));
+                d3.select(this).append("text")
+                    .attr("x", 26)
+                    .attr("y", 13)
+                    .attr("font-size", "15px")
+                    .text(d);
+            });
+    }
+}
 
 //////////////////////////////////////
 // 3. HEATMAP  //
@@ -450,7 +612,7 @@ function createChart3(data) {
         );
 
         // Set up SVG
-        const cellSize = 32, margin = {top: 60, right: 10, bottom: 70, left: 120};
+        const cellSize = 32, margin = {top: 60, right: 10, bottom: 110, left: 120};
         const width = colVals.length * cellSize + margin.left + margin.right;
         const height = rowVals.length * cellSize + margin.top + margin.bottom;
 
@@ -460,11 +622,22 @@ function createChart3(data) {
             .attr("width", width)
             .attr("height", height);
 
-        // Color scale
-        const flat = matrix.flat().filter(x => x !== null);
-        const color = agg === "count"
-            ? d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(flat)])
-            : d3.scaleSequential(d3.interpolateYlGnBu).domain([d3.min(flat), d3.max(flat)]);
+        // Color scale (domain based on agg function)
+        const flat = matrix.flat().filter(x => x !== null && !isNaN(x));
+        let color, colorInterp, cmin, cmax, colorTitle;
+        if (agg === "count") {
+            cmin = 0;
+            cmax = d3.max(flat);
+            colorInterp = d3.interpolateBlues;
+            color = d3.scaleSequential(colorInterp).domain([cmin, cmax]);
+            colorTitle = "Count";
+        } else {
+            cmin = d3.min(flat);
+            cmax = d3.max(flat);
+            colorInterp = d3.interpolateYlGnBu;
+            color = d3.scaleSequential(colorInterp).domain([cmin, cmax]);
+            colorTitle = agg === "median" ? `Median ${valueAttr}` : `Mean ${valueAttr}`;
+        }
 
         // Draw cells
         const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
@@ -546,12 +719,69 @@ function createChart3(data) {
             .attr("font-size", "18px")
             .attr("font-weight", "bold")
             .text(`${agg === "count" ? "Count" : valueAttr} by ${rowAttr} vs ${colAttr}`);
-    }
+
+        // === Colorbar legend ===
+        const legendBarWidth = Math.max(180, Math.min(350, colVals.length * cellSize));
+        const legendBarHeight = 14;
+        const legendSteps = 64;
+        const legendX = margin.left;
+        const legendY = height - 60;
+
+        // Colorbar gradient
+        const defs = svg.append("defs");
+        const gradientId = "heatmap-color-gradient";
+        const grad = defs.append("linearGradient")
+            .attr("id", gradientId)
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "100%")
+            .attr("y2", "0%");
+        for (let i = 0; i <= legendSteps; i++) {
+            grad.append("stop")
+                .attr("offset", `${(i/legendSteps)*100}%`)
+                .attr("stop-color", color(cmin + (cmax-cmin)*i/legendSteps));
+        }
+
+        // Draw colorbar rect
+        svg.append("rect")
+            .attr("x", legendX)
+            .attr("y", legendY)
+            .attr("width", legendBarWidth)
+            .attr("height", legendBarHeight)
+            .style("fill", `url(#${gradientId})`)
+            .attr("stroke", "#aaa");
+
+        // Legend min, max labels
+        svg.append("text")
+            .attr("x", legendX)
+            .attr("y", legendY + legendBarHeight + 17)
+            .attr("font-size", 12)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#555")
+            .text(agg === "count" ? 0 : cmin.toFixed(2));
+        svg.append("text")
+            .attr("x", legendX + legendBarWidth)
+            .attr("y", legendY + legendBarHeight + 17)
+            .attr("font-size", 12)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#555")
+            .text(agg === "count" ? cmax : cmax.toFixed(2));
+        // Legend title
+        svg.append("text")
+            .attr("x", legendX + legendBarWidth / 2)
+            .attr("y", legendY - 8)
+            .attr("font-size", 13)
+            .attr("font-weight", "bold")
+            .attr("text-anchor", "middle")
+            .text(colorTitle);
+
+    } // End drawHeatmap
 
     // Draw once, and whenever any dropdown changes
     drawHeatmap();
     d3.selectAll("#heatmap-row,#heatmap-col,#heatmap-value,#heatmap-agg").on("change", drawHeatmap);
 }
+
 
 //////////////////////////////////////
 // 4. BOX PLOT BY GROUP            //
@@ -564,7 +794,7 @@ function createChart4(data) {
         d3.select("#chart4").append("div").text("Please select both a numeric and categorical column!");
         return;
     }
-    // Increase visualization size!
+
     const width = 700;
     const height = 700;
     const margin = {top: 40, right: 30, bottom: 70, left: 70};
@@ -590,7 +820,7 @@ function createChart4(data) {
 
     const y = d3.scaleLinear()
         .domain([
-            d3.min(grouped, d => d.min), 
+            d3.min(grouped, d => d.min),
             d3.max(grouped, d => d.max)
         ])
         .nice()
@@ -600,6 +830,20 @@ function createChart4(data) {
         .append("svg")
         .attr("width", width)
         .attr("height", height);
+
+    // Tooltip setup
+    d3.select("#boxplot-tooltip").remove();
+    const tooltip = d3.select("body").append("div")
+        .attr("id", "boxplot-tooltip")
+        .style("position", "absolute")
+        .style("background", "#fff")
+        .style("border", "1px solid #aaa")
+        .style("padding", "6px 12px")
+        .style("border-radius", "6px")
+        .style("box-shadow", "0 2px 8px rgba(0,0,0,0.13)")
+        .style("pointer-events", "none")
+        .style("font-size", "13px")
+        .style("visibility", "hidden");
 
     // X Axis
     svg.append("g")
@@ -612,7 +856,6 @@ function createChart4(data) {
         .attr("dy", "0.3em")
         .attr("transform", "rotate(-35)");
 
-
     // Y Axis
     svg.append("g")
         .attr("transform", `translate(${margin.left},0)`)
@@ -620,7 +863,7 @@ function createChart4(data) {
         .selectAll("text")
         .attr("font-size", 14);
 
-    // Boxes
+    // Boxes (Q1 to Q3)
     svg.selectAll("rect.box")
         .data(grouped)
         .enter().append("rect")
@@ -629,7 +872,23 @@ function createChart4(data) {
         .attr("y", d => y(d.q3))
         .attr("width", x.bandwidth())
         .attr("height", d => y(d.q1) - y(d.q3))
-        .attr("fill", "#a6cee3");
+        .attr("fill", "#a6cee3")
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("stroke", "#1f78b4").attr("stroke-width", 2);
+            tooltip.html(
+                `<strong>${catCol}: ${d.key}</strong><br>
+                Q1: <b>${d.q1.toFixed(2)}</b><br>
+                Q3: <b>${d.q3.toFixed(2)}</b>`
+            ).style("visibility", "visible");
+        })
+        .on("mousemove", function(event) {
+            tooltip.style("top", (event.pageY - 40) + "px")
+                   .style("left", (event.pageX + 12) + "px");
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("stroke", null);
+            tooltip.style("visibility", "hidden");
+        });
 
     // Medians
     svg.selectAll("line.median")
@@ -641,28 +900,78 @@ function createChart4(data) {
         .attr("y1", d => y(d.median))
         .attr("y2", d => y(d.median))
         .attr("stroke", "#1f78b4")
-        .attr("stroke-width", 2);
+        .attr("stroke-width", 2)
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("stroke", "#d62728");
+            tooltip.html(
+                `<strong>${catCol}: ${d.key}</strong><br>
+                Median: <b>${d.median.toFixed(2)}</b>`
+            ).style("visibility", "visible");
+        })
+        .on("mousemove", function(event) {
+            tooltip.style("top", (event.pageY - 40) + "px")
+                   .style("left", (event.pageX + 12) + "px");
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("stroke", "#1f78b4");
+            tooltip.style("visibility", "hidden");
+        });
 
-    // Whiskers
+    // Whiskers (min to Q1)
     svg.selectAll("line.min")
         .data(grouped)
         .enter().append("line")
+        .attr("class", "min-whisker")
         .attr("x1", d => x(d.key) + x.bandwidth()/2)
         .attr("x2", d => x(d.key) + x.bandwidth()/2)
         .attr("y1", d => y(d.min))
         .attr("y2", d => y(d.q1))
-        .attr("stroke", "black");
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.2)
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("stroke", "#d62728");
+            tooltip.html(
+                `<strong>${catCol}: ${d.key}</strong><br>
+                Min: <b>${d.min.toFixed(2)}</b>`
+            ).style("visibility", "visible");
+        })
+        .on("mousemove", function(event) {
+            tooltip.style("top", (event.pageY - 40) + "px")
+                   .style("left", (event.pageX + 12) + "px");
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("stroke", "black");
+            tooltip.style("visibility", "hidden");
+        });
 
+    // Whiskers (Q3 to max)
     svg.selectAll("line.max")
         .data(grouped)
         .enter().append("line")
+        .attr("class", "max-whisker")
         .attr("x1", d => x(d.key) + x.bandwidth()/2)
         .attr("x2", d => x(d.key) + x.bandwidth()/2)
         .attr("y1", d => y(d.q3))
         .attr("y2", d => y(d.max))
-        .attr("stroke", "black");
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.2)
+        .on("mouseover", function(event, d) {
+            d3.select(this).attr("stroke", "#d62728");
+            tooltip.html(
+                `<strong>${catCol}: ${d.key}</strong><br>
+                Max: <b>${d.max.toFixed(2)}</b>`
+            ).style("visibility", "visible");
+        })
+        .on("mousemove", function(event) {
+            tooltip.style("top", (event.pageY - 40) + "px")
+                   .style("left", (event.pageX + 12) + "px");
+        })
+        .on("mouseout", function() {
+            d3.select(this).attr("stroke", "black");
+            tooltip.style("visibility", "hidden");
+        });
 
-    // Optionally add titles
+    // Title
     svg.append("text")
         .attr("x", width/2)
         .attr("y", margin.top/2)

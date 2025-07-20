@@ -306,4 +306,39 @@ div.tooltip {
   box-sizing: border-box;
 }
 
+/* For the overlay modal */
+#splom-modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.15);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1010;
+}
+#splom-modal svg {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 6px 28px rgba(0,0,0,0.18);
+    max-width: 98vw;
+    max-height: 96vh;
+}
+#splom-modal-close {
+    position: absolute;
+    top: 32px;
+    right: 38px;
+    font-size: 38px;
+    font-weight: bold;
+    color: #222;
+    cursor: pointer;
+    z-index: 1020;
+    background: rgba(255,255,255,0.8);
+    border-radius: 6px;
+    padding: 0 13px 3px 13px;
+    line-height: 1.2;
+    transition: background 0.2s;
+}
+#splom-modal-close:hover { background: #e8e8e8; }
+
 
