@@ -290,3 +290,20 @@ div.tooltip {
     
 }
 
+/* Only for the first vis-block, the Parallel Coordinates */
+.dashboardGrid > .vis-block:first-child {
+    padding: 0;
+}
+
+#chart1 {
+  width: 100%;
+  min-width: 600px;
+  max-width: 100vw;
+}
+.vis-block {
+  min-width: 600px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+

@@ -119,7 +119,6 @@ function fillParcoordsCheckboxes(numerical, selected=[]) {
 function createChart1(data) {
     d3.select("#chart1").selectAll("*").remove();
 
-    // Read checked axes
     let axes = [];
     d3.selectAll("#parcoordsAxesCheckboxes input[type='checkbox']").each(function() {
         if (d3.select(this).property("checked")) axes.push(this.value);
@@ -130,26 +129,29 @@ function createChart1(data) {
         return;
     }
 
-    // Larger dimensions!
-    const container = document.getElementById('chart1');
-    const width = container.clientWidth || 800;   // fallback to 800 if needed
-    const height = Math.round(width * 0.7);       // aspect ratio, can adjust
+    // 1. Use *all* available container width and max height
+    // Use parent .vis-block or .dashboardGrid (whichever wraps your chart)
+    const parent = document.getElementById('chart1').parentElement;
+    const width = parent.clientWidth || 800; // fallback
 
-    const margin = {top: 40, right: 40, bottom: 40, left: 40};
+    const height = Math.round(width * 0.65); // less tall, still roomy
+
+    // 2. Set super slim margins to use *all* space
+    const margin = {top: 100, right: 38, bottom: 60, left: 38};
+
+
     const w = width - margin.left - margin.right;
     const h = height - margin.top - margin.bottom;
 
-
+    // 3. SVG uses 100% width, matches parent size
     const svg = d3.select("#chart1")
         .append("svg")
-        .attr("width", "100%")    // let SVG fill the div
+        .attr("width", "100%")
         .attr("height", height)
-        .attr("viewBox", `0 0 ${width} ${height}`);  // scales all drawing commands
-
+        .attr("viewBox", `0 0 ${width} ${height}`);
 
     const g = svg.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
-
 
     // Y scale per axis
     const y = {};
@@ -159,13 +161,12 @@ function createChart1(data) {
             .range([h, 0]);
     });
 
-    // X scale for axes
+    // X scale: spans absolutely all available space
     const x = d3.scalePoint()
         .range([0, w])
         .padding(1)
         .domain(axes);
 
-    // Draw lines
     g.append("g")
         .attr("class", "foreground")
         .selectAll("path")
@@ -176,7 +177,10 @@ function createChart1(data) {
         .attr("fill", "none")
         .attr("opacity", 0.3);
 
-    // Draw axes
+    // Dynamic label size: as big as possible but never too big/small
+    const fontSize = 12;
+
+
     const axisG = g.selectAll(".axis")
         .data(axes)
         .join("g")
@@ -184,21 +188,19 @@ function createChart1(data) {
         .attr("transform", d => `translate(${x(d)})`)
         .each(function(d) { d3.select(this).call(d3.axisLeft(y[d])); });
 
-    // Axis labels
-    const fontSize = Math.max(7, Math.min(10, Math.floor(w / axes.length / 4)));
+    const tiltLabels = true; // set to false if you want to disable tilt
 
     axisG.append("text")
-        .attr("y", -10)
+        .attr("y", -4)
         .attr("fill", "#000")
         .attr("font-weight", "bold")
         .attr("font-size", fontSize)
-        .attr("text-anchor", axes.length > 7 ? "end" : "middle")
-        .attr("transform", axes.length > 7 ? "rotate(-40)" : null)
+        .attr("text-anchor", "end")
+        .attr("transform", "rotate(45)")
         .text(d => d);
 
 
 }
-
 
 //////////////////////////////////////
 // 2. SCATTERPLOT MATRIX (SPLOM)   //
@@ -206,13 +208,27 @@ function createChart1(data) {
 function createChart2(data) {
     d3.select("#chart2").selectAll("*").remove();
     const { numerical, categorical } = detectColumnTypes(data);
-    
+
     if (numerical.length < 2) {
         d3.select("#chart2").append("div").text("Not enough numeric columns!");
         return;
     }
+
     const container = document.getElementById('chart2');
-    const width = container.clientWidth || 700;
+    const width = container.clientWidth || 900;
+
+    // Padding and sizing tweaks
+    const containerPad = 48;
+    const topPad = 38;
+    const labelPad = 30;
+    const padding = 14;
+    const legendBoxSize = 18;
+    const legendWidth = 110;
+    const n = numerical.length;
+    const matrixWidth = width - legendWidth - padding * 3 - labelPad - containerPad;
+    const size = Math.max(44, Math.min(90, Math.floor(matrixWidth / n)));
+    const height = size * n + padding * 3 + topPad;
+    const gridOriginX = labelPad + containerPad;
 
     const colorBy = d3.select("#splomColor").property("value") || categorical[0];
     const colorValues = Array.from(new Set(data.map(d => d[colorBy])));
@@ -220,24 +236,13 @@ function createChart2(data) {
         .domain(colorValues)
         .range(d3.schemeCategory10);
 
-    // --- Layout
-    const n = numerical.length;
-    const padding = 18;
-    const legendBoxSize = 22;
-    const legendWidth = 130;
-
-    // Figure out how much space is left for each cell:
-    const matrixWidth = width - legendWidth - padding * 3;
-    const size = Math.max(50, Math.min(110, Math.floor(matrixWidth / n))); // adjust as needed
-    const height = size * n + padding * 3;
-
     const svg = d3.select("#chart2")
-    .append("svg")
-    .attr("width", "100%")
-    .attr("height", height)
-    .attr("viewBox", `0 0 ${width} ${height}`);
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", height)
+        .attr("viewBox", `0 0 ${width} ${height}`);
 
-    // Scales for each variable
+    // Scales
     const scales = {};
     numerical.forEach(attr => {
         scales[attr] = d3.scaleLinear()
@@ -246,42 +251,41 @@ function createChart2(data) {
             .range([padding, size - padding]);
     });
 
-    // Grid cell plotting
+    // SPLOM grid
     for (let row = 0; row < n; ++row) {
         for (let col = 0; col < n; ++col) {
             const cell = svg.append("g")
-                .attr("transform", `translate(${col * size + padding*2},${row * size + padding*2})`);
+                .attr("transform", `translate(${col * size + padding*2 + gridOriginX},${row * size + padding*2 + topPad})`);
 
-            // === Draw grid background ===
-            const xTicks = scales[numerical[col]].ticks(5);
-            const yTicks = scales[numerical[row]].ticks(5);
-
-            // Vertical grid lines
-            cell.selectAll("grid-x")
-                .data(xTicks)
-                .enter()
-                .append("line")
-                .attr("x1", d => scales[numerical[col]](d))
-                .attr("x2", d => scales[numerical[col]](d))
-                .attr("y1", padding)
-                .attr("y2", size - padding)
-                .attr("stroke", "#dddddd")
-                .attr("stroke-width", 1);
-
-            // Horizontal grid lines
-            cell.selectAll("grid-y")
-                .data(yTicks)
-                .enter()
-                .append("line")
-                .attr("y1", d => scales[numerical[row]](d))
-                .attr("y2", d => scales[numerical[row]](d))
-                .attr("x1", padding)
-                .attr("x2", size - padding)
-                .attr("stroke", "#dddddd")
-                .attr("stroke-width", 1);
-
-            // === Data points ===
+            // Only draw grid lines and points for off-diagonal cells
             if (row !== col) {
+                // Grid lines
+                const xTicks = scales[numerical[col]].ticks(5);
+                const yTicks = scales[numerical[row]].ticks(5);
+
+                cell.selectAll("grid-x")
+                    .data(xTicks)
+                    .enter()
+                    .append("line")
+                    .attr("x1", d => scales[numerical[col]](d))
+                    .attr("x2", d => scales[numerical[col]](d))
+                    .attr("y1", padding)
+                    .attr("y2", size - padding)
+                    .attr("stroke", "#dddddd")
+                    .attr("stroke-width", 1);
+
+                cell.selectAll("grid-y")
+                    .data(yTicks)
+                    .enter()
+                    .append("line")
+                    .attr("y1", d => scales[numerical[row]](d))
+                    .attr("y2", d => scales[numerical[row]](d))
+                    .attr("x1", padding)
+                    .attr("x2", size - padding)
+                    .attr("stroke", "#dddddd")
+                    .attr("stroke-width", 1);
+
+                // Data points
                 cell.selectAll("circle")
                     .data(data)
                     .join("circle")
@@ -291,38 +295,61 @@ function createChart2(data) {
                     .attr("fill", d => colorScale(d[colorBy]))
                     .attr("opacity", 0.7);
             } else {
-                cell.append("text")
-                    .attr("x", size/2)
-                    .attr("y", size/2)
+                // Diagonal: attribute label (split across lines if needed)
+                const label = numerical[row];
+                const split = label.split(" ");
+                const textElem = cell.append("text")
+                    .attr("x", size / 2)
+                    .attr("y", size / 2 - (split.length > 1 ? 10 : -2)) // Move a bit lower (less negative)
                     .attr("text-anchor", "middle")
-                    .attr("font-weight", "bold")
-                    .attr("font-size", "13px")
-                    .text(numerical[row]);
+                    .attr("font-size", 13)
+                    .style("font-size", "13px"); // Not bold!
+                split.forEach((line, i) => {
+                    textElem.append("tspan")
+                        .attr("x", size / 2)
+                        .attr("dy", i === 0 ? 0 : 15)
+                        .text(line);
+                });
             }
 
-            // X axis attribute label (top row)
+            // X axis attribute label (top row), split if needed
             if (row === 0) {
-                cell.append("text")
-                    .attr("x", size/2)
-                    .attr("y", -6)
+                const label = numerical[col];
+                const split = label.split(" ");
+                const textElem = cell.append("text")
+                    .attr("x", size / 2)
+                    .attr("y", -30)
                     .attr("text-anchor", "middle")
                     .attr("font-size", "11px")
-                    .attr("fill", "#555")
-                    .text(numerical[col]);
+                    .attr("fill", "#555");
+                split.forEach((line, i) => {
+                    textElem.append("tspan")
+                        .attr("x", size / 2)
+                        .attr("dy", i === 0 ? 0 : 13)
+                        .text(line);
+                });
             }
-            // Y axis attribute label (left col)
+
+            // Y axis attribute label (left col), split if needed
             if (col === 0) {
-                cell.append("text")
-                    .attr("x", -size * 0.17)    // Move label further left (adjust as needed)
-                    .attr("y", size / 2)
+                const label = numerical[row];
+                const split = label.split(" ");
+                const textElem = cell.append("text")
+                    .attr("x", -labelPad + 13)
+                    .attr("y", size / 2 - (split.length > 1 ? 26 : 18))
                     .attr("text-anchor", "end")
                     .attr("font-size", "13px")
                     .attr("fill", "#555")
-                    .attr("transform", `rotate(-90, ${-size * 0.17}, ${size / 2})`)
-                    .text(numerical[row]);
+                    .attr("alignment-baseline", "middle");
+                split.forEach((line, i) => {
+                    textElem.append("tspan")
+                        .attr("x", -labelPad + 13)
+                        .attr("dy", i === 0 ? 0 : 15)
+                        .text(line);
+                });
             }
 
-            // Cell outline (optional, to match your image)
+            // Cell outline
             cell.append("rect")
                 .attr("x", 0)
                 .attr("y", 0)
@@ -333,9 +360,9 @@ function createChart2(data) {
         }
     }
 
-    // Legend at right
+    // Legend at right (tight to plot)
     const legend = svg.append("g")
-        .attr("transform", `translate(${size * n + padding*2 + 25},${padding*2})`);
+        .attr("transform", `translate(${size * n + padding*2 + gridOriginX + 10},${padding*2 + topPad})`);
     legend.selectAll("legendEntry")
         .data(colorValues)
         .enter()
@@ -360,8 +387,8 @@ function createChart2(data) {
         .attr("font-weight", "bold")
         .attr("font-size", "13px")
         .text(colorBy);
-
 }
+
 
 //////////////////////////////////////
 // 3. HEATMAP  //
