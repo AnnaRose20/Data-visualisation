@@ -296,12 +296,12 @@ function createChart2(data) {
             // Y axis attribute label (left col)
             if (col === 0) {
                 cell.append("text")
-                    .attr("x", -6)
-                    .attr("y", size/2)
+                    .attr("x", -size * 0.17)    // Move label further left (adjust as needed)
+                    .attr("y", size / 2)
                     .attr("text-anchor", "end")
-                    .attr("font-size", "11px")
+                    .attr("font-size", "13px")
                     .attr("fill", "#555")
-                    .attr("transform", `rotate(-90,-6,${size/2})`)
+                    .attr("transform", `rotate(-90, ${-size * 0.17}, ${size / 2})`)
                     .text(numerical[row]);
             }
 
@@ -347,212 +347,167 @@ function createChart2(data) {
 }
 
 //////////////////////////////////////
-// 3. SUNBURST (CATEGORICAL TREE)  //
+// 3. HEATMAP  //
 //////////////////////////////////////
 
 function createChart3(data) {
-    // 1. Find categorical columns (with ≤20 unique values, no id-like cols)
-    const maxLevels = 4, maxUniques = 20;
-    const allKeys = Object.keys(data[0]);
-    const cats = allKeys.filter(col => {
-        const unique = new Set(data.map(d => d[col])).size;
-        return unique > 1 && unique <= maxUniques && !col.match(/id/i);
-    });
+    // Helper: get categorical and numeric columns
+    const maxUniques = 20;
+    const columns = Object.keys(data[0]);
+    const cats = columns.filter(
+        col => (new Set(data.map(d => d[col])).size > 1) &&
+               (new Set(data.map(d => d[col])).size <= maxUniques) &&
+               !col.match(/id/i)
+    );
+    const nums = columns.filter(
+        col => data.every(d => !isNaN(+d[col]))
+    );
 
-    // Remove existing controls and chart SVG
-    d3.select("#chart3-controls").selectAll("*").remove();
-    d3.select("#chart3").selectAll("*").remove();
-
-    // If not enough categories, show a message and exit.
-    if (cats.length < 2) {
-        d3.select("#chart3").append("div").text("Not enough categorical columns for sunburst!");
-        return;
-    }
-
-    // --- Controls container OUTSIDE the SVG
-    function addDropdown(id, label, defaultVal) {
-        d3.select("#chart3-controls")
-            .append("label")
-            .attr("for", id)
-            .style("margin-right", "3px")
-            .text(label);
-        d3.select("#chart3-controls")
-            .append("select")
-            .attr("id", id)
-            .style("margin-right", "12px")
-            .selectAll("option")
-            .data([""].concat(cats))
-            .enter()
-            .append("option")
+    // Populate dropdowns
+    function populateDropdown(id, options, defaultVal) {
+        const select = d3.select(id);
+        select.selectAll("option").remove();
+        select.selectAll("option")
+            .data(options)
+            .enter().append("option")
             .attr("value", d => d)
-            .text(d => d ? d : "None");
-        d3.select(`#${id}`).property("value", defaultVal);
+            .text(d => d);
+        if (defaultVal) select.property("value", defaultVal);
     }
+    populateDropdown("#heatmap-row", cats, cats[0]);
+    populateDropdown("#heatmap-col", cats, cats[1] || cats[0]);
+    populateDropdown("#heatmap-value", nums, nums[0] || "");
+    d3.select("#heatmap-agg").property("value", "mean");
 
-    // Four dropdowns for hierarchy levels
-    addDropdown("sunburst-level-1", "Level 1:", cats[0]);
-    addDropdown("sunburst-level-2", "Level 2:", cats[1]);
-    addDropdown("sunburst-level-3", "Level 3:", cats[2]);
-    addDropdown("sunburst-level-4", "Level 4:", cats[3]);
+    // Heatmap drawing function
+    function drawHeatmap() {
+        const rowAttr = d3.select("#heatmap-row").property("value");
+        const colAttr = d3.select("#heatmap-col").property("value");
+        const valueAttr = d3.select("#heatmap-value").property("value");
+        const agg = d3.select("#heatmap-agg").property("value");
+        if (!(rowAttr && colAttr && valueAttr)) return;
 
-    function getLevels() {
-        return [
-            d3.select("#sunburst-level-1").property("value"),
-            d3.select("#sunburst-level-2").property("value"),
-            d3.select("#sunburst-level-3").property("value"),
-            d3.select("#sunburst-level-4").property("value"),
-        ].filter(d => d);
-    }
+        // Aggregation function
+        let aggFunc = d3.mean;
+        if (agg === "median") aggFunc = d3.median;
+        if (agg === "count") aggFunc = vals => vals.length;
 
-    function drawSunburst() {
-        d3.select("#chart3").selectAll("*").remove();
+        // Unique row/col labels
+        const rowVals = Array.from(new Set(data.map(d => d[rowAttr]))).sort();
+        const colVals = Array.from(new Set(data.map(d => d[colAttr]))).sort();
 
-        const levels = getLevels();
-        if (levels.length < 2) {
-            d3.select("#chart3").append("div").text("Select at least 2 categorical columns for the sunburst!");
-            return;
-        }
+        // Compute matrix
+        const matrix = rowVals.map(row =>
+            colVals.map(col => {
+                const vals = data.filter(d => d[rowAttr] === row && d[colAttr] === col)
+                                 .map(d => +d[valueAttr]);
+                return vals.length ? aggFunc(vals) : null;
+            })
+        );
 
-        // Convert data to hierarchy
-        function nestData(rows, levels) {
-            if (!levels.length) return rows.length;
-            const [level, ...rest] = levels;
-            return Array.from(d3.group(rows, d => d[level]), ([k, v]) => ({
-                name: k,
-                children: nestData(v, rest)
-            }));
-        }
-        const rootData = { name: "root", children: nestData(data, levels) };
+        // Set up SVG
+        const cellSize = 32, margin = {top: 60, right: 10, bottom: 70, left: 120};
+        const width = colVals.length * cellSize + margin.left + margin.right;
+        const height = rowVals.length * cellSize + margin.top + margin.bottom;
 
-        const width = 500, radius = width / 2;
+        d3.select("#heatmap").selectAll("*").remove();
 
-        const partition = data => d3.partition()
-            .size([2 * Math.PI, radius])
-            (d3.hierarchy(data)
-            .sum(d => d.value || (d.children ? 0 : 1)));
-
-        const root = partition(rootData);
-        root.each(d => d.current = d);
-
-        // Rainbow palette
-        const color = d3.scaleOrdinal()
-            .domain(root.children.map(d => d.data.name))
-            .range(d3.quantize(t => d3.interpolateRainbow(t * 0.8 + 0.1), root.children.length + 1));
-
-        const svg = d3.select("#chart3")
-            .append("svg")
+        const svg = d3.select("#heatmap").append("svg")
             .attr("width", width)
-            .attr("height", width)
-            .attr("viewBox", [0, 0, width, width])
-            .style("font", "12px sans-serif")
-            .style("display", "block");
+            .attr("height", height);
 
-        const g = svg.append("g")
-            .attr("transform", `translate(${width / 2},${width / 2})`);
+        // Color scale
+        const flat = matrix.flat().filter(x => x !== null);
+        const color = agg === "count"
+            ? d3.scaleSequential(d3.interpolateBlues).domain([0, d3.max(flat)])
+            : d3.scaleSequential(d3.interpolateYlGnBu).domain([d3.min(flat), d3.max(flat)]);
 
-        const arc = d3.arc()
-            .startAngle(d => d.x0)
-            .endAngle(d => d.x1)
-            .innerRadius(d => d.y0)
-            .outerRadius(d => d.y1 - 1);
+        // Draw cells
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+        g.selectAll("g")
+            .data(matrix)
+            .join("g")
+            .attr("transform", (_, i) => `translate(0,${i*cellSize})`)
+            .selectAll("rect")
+            .data(d => d)
+            .join("rect")
+            .attr("x", (_, j) => j * cellSize)
+            .attr("width", cellSize)
+            .attr("height", cellSize)
+            .attr("fill", d => d !== null ? color(d) : "#eee")
+            .attr("stroke", "#fff");
+
+        // Row labels
+        svg.append("g").attr("transform", `translate(${margin.left-5},${margin.top})`)
+            .selectAll("text")
+            .data(rowVals)
+            .join("text")
+            .attr("y", (_, i) => i*cellSize + cellSize/2)
+            .attr("x", -8)
+            .attr("dy", ".32em")
+            .attr("text-anchor", "end")
+            .text(d => d)
+            .style("font-size", "13px");
+
+        // Col labels
+        svg.append("g").attr("transform", `translate(${margin.left},${margin.top-8})`)
+            .selectAll("text")
+            .data(colVals)
+            .join("text")
+            .attr("x", (_, j) => j*cellSize + cellSize/2)
+            .attr("y", 0)
+            .attr("text-anchor", "middle")
+            .attr("transform", (_, j) => `rotate(-45,${j*cellSize + cellSize/2},0)`)
+            .text(d => d)
+            .style("font-size", "13px");
 
         // Tooltip
+        d3.select("#heatmap-tooltip").remove();
         const tooltip = d3.select("body").append("div")
-            .attr("id", "chart3-tooltip")
+            .attr("id", "heatmap-tooltip")
             .style("position", "absolute")
-            .style("z-index", 10)
-            .style("visibility", "hidden")
             .style("background", "#fff")
             .style("border", "1px solid #aaa")
             .style("padding", "5px 10px")
             .style("border-radius", "6px")
-            .style("box-shadow", "0 2px 8px rgba(0,0,0,0.13)");
+            .style("box-shadow", "0 2px 8px rgba(0,0,0,0.13)")
+            .style("pointer-events", "none")
+            .style("visibility", "hidden");
 
-        // Draw arcs
-        const path = g.append("g")
-            .selectAll("path")
-            .data(root.descendants().filter(d => d.depth))
-            .join("path")
-            .attr("fill", d => { while (d.depth > 1) d = d.parent; return color(d.data.name); })
-            .attr("d", arc)
+        g.selectAll("rect")
             .on("mouseover", function(event, d) {
-                d3.select(this).attr("stroke", "#222");
-                tooltip.html(
-                    `<strong>${d.ancestors().map(d => d.data.name).reverse().slice(1).join(" / ")}</strong><br>Count: ${d.value}`
-                ).style("visibility", "visible");
+                if (d !== null) {
+                    d3.select(this).attr("stroke", "#222");
+                    const i = d3.select(this.parentNode).datum();
+                    const rowIdx = matrix.indexOf(i);
+                    const colIdx = Array.from(d3.select(this.parentNode).selectAll("rect").nodes()).indexOf(this);
+                    tooltip.html(`<strong>${rowAttr}:</strong> ${rowVals[rowIdx]}<br><strong>${colAttr}:</strong> ${colVals[colIdx]}<br><strong>${agg === "count" ? "Count" : valueAttr}:</strong> ${d.toFixed(2)}`)
+                        .style("visibility", "visible");
+                }
             })
             .on("mousemove", function(event) {
                 tooltip.style("top", (event.pageY - 40) + "px")
-                    .style("left", (event.pageX + 12) + "px");
+                       .style("left", (event.pageX + 12) + "px");
             })
             .on("mouseout", function() {
-                d3.select(this).attr("stroke", null);
+                d3.select(this).attr("stroke", "#fff");
                 tooltip.style("visibility", "hidden");
-            })
-            .on("click", clicked);
-
-        // Draw labels on arcs
-        const label = g.append("g")
-            .attr("pointer-events", "none")
-            .attr("text-anchor", "middle")
-            .selectAll("text")
-            .data(root.descendants().filter(d => d.depth))
-            .join("text")
-            .attr("transform", d => labelTransform(d, radius))
-            .attr("display", d => labelVisible(d) ? null : "none")
-            .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .text(d => d.data.name);
-
-        // Center label for zoom out
-        g.append("text")
-            .attr("text-anchor", "middle")
-            .attr("dy", "0.35em")
-            .attr("font-weight", "bold")
-            .attr("font-size", 16)
-            .style("pointer-events", "auto")
-            .style("cursor", "pointer")
-            .text("Zoom out")
-            .on("click", (event) => clicked(event, root));
-
-        // Zoom transition
-        function clicked(event, p) {
-            root.each(d => d.target = {
-                x0: Math.max(0, Math.min(1, (d.x0 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
-                x1: Math.max(0, Math.min(1, (d.x1 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
-                y0: Math.max(0, d.y0 - p.y0),
-                y1: Math.max(0, d.y1 - p.y0)
             });
 
-            const t = g.transition().duration(750);
-
-            path.transition(t)
-                .tween("data", d => {
-                    const i = d3.interpolate(d.current, d.target);
-                    return t => d.current = i(t);
-                })
-                .attrTween("d", d => () => arc(d.current));
-
-            label.transition(t)
-                .attr("display", d => labelVisible(d.target) ? null : "none")
-                .attrTween("transform", d => () => labelTransform(d.current, radius));
-        }
-
-        function labelVisible(d) {
-            return d.y1 <= radius && d.y0 >= 0 && (d.x1 - d.x0) > 0.03;
-        }
-        function labelTransform(d, radius) {
-            const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
-            const y = (d.y0 + d.y1) / 2;
-            return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;
-        }
+        // Title
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", 28)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "18px")
+            .attr("font-weight", "bold")
+            .text(`${agg === "count" ? "Count" : valueAttr} by ${rowAttr} vs ${colAttr}`);
     }
 
-    // Draw once at load, and whenever any dropdown changes
-    drawSunburst();
-    d3.selectAll("#chart3-controls select").on("change", drawSunburst);
+    // Draw once, and whenever any dropdown changes
+    drawHeatmap();
+    d3.selectAll("#heatmap-row,#heatmap-col,#heatmap-value,#heatmap-agg").on("change", drawHeatmap);
 }
-
 
 //////////////////////////////////////
 // 4. BOX PLOT BY GROUP            //
@@ -565,6 +520,11 @@ function createChart4(data) {
         d3.select("#chart4").append("div").text("Please select both a numeric and categorical column!");
         return;
     }
+    // Increase visualization size!
+    const width = 700;
+    const height = 700;
+    const margin = {top: 40, right: 30, bottom: 70, left: 70};
+
     // Group data
     const grouped = Array.from(d3.group(data, d => d[catCol]), ([key, values]) => {
         const vals = values.map(d => +d[numCol]).filter(v => !isNaN(v));
@@ -579,23 +539,42 @@ function createChart4(data) {
         };
     });
 
-    const x = d3.scaleBand().domain(grouped.map(d => d.key)).range([40, width-20]).padding(0.2);
-    const y = d3.scaleLinear().domain([
-        d3.min(grouped, d => d.min), d3.max(grouped, d => d.max)
-    ]).nice().range([height-30, 10]);
+    const x = d3.scaleBand()
+        .domain(grouped.map(d => d.key))
+        .range([margin.left, width - margin.right])
+        .padding(0.2);
+
+    const y = d3.scaleLinear()
+        .domain([
+            d3.min(grouped, d => d.min), 
+            d3.max(grouped, d => d.max)
+        ])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
 
     const svg = d3.select("#chart4")
         .append("svg")
         .attr("width", width)
         .attr("height", height);
 
-    // Axes
+    // X Axis
     svg.append("g")
-        .attr("transform", `translate(0,${height-30})`)
-        .call(d3.axisBottom(x));
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("font-size", 14)
+        .attr("text-anchor", "end")
+        .attr("dx", "-0.6em")
+        .attr("dy", "0.3em")
+        .attr("transform", "rotate(-35)");
+
+
+    // Y Axis
     svg.append("g")
-        .attr("transform", `translate(40,0)`)
-        .call(d3.axisLeft(y));
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y))
+        .selectAll("text")
+        .attr("font-size", 14);
 
     // Boxes
     svg.selectAll("rect.box")
@@ -629,6 +608,7 @@ function createChart4(data) {
         .attr("y1", d => y(d.min))
         .attr("y2", d => y(d.q1))
         .attr("stroke", "black");
+
     svg.selectAll("line.max")
         .data(grouped)
         .enter().append("line")
@@ -637,4 +617,14 @@ function createChart4(data) {
         .attr("y1", d => y(d.q3))
         .attr("y2", d => y(d.max))
         .attr("stroke", "black");
+
+    // Optionally add titles
+    svg.append("text")
+        .attr("x", width/2)
+        .attr("y", margin.top/2)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 20)
+        .attr("font-weight", "bold")
+        .text(`${numCol} by ${catCol}`);
 }
+

@@ -20,25 +20,20 @@
 
     <!-- include d3 -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
-
     <!-- include jQueryUI -->
     <script src="https://code.jquery.com/jquery-3.6.1.js"></script>
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
-
-    <!-- PART 1: include dataVis script -->
+    <!-- include your scripts -->
     <script src="dataVis.js"></script>
-    <!-- PART 2: include scripts for the dashboard -->
     <script src="dashboard.js"></script>
-
 </head>
 
-<!-- call init function when page has loaded -->
 <body onload="init()">
 
 <div class="header-container">
     <h1>Data Visualization Exercise</h1>
     <div id="credits">
-        Created by <span class="instructions">ANNA ROSE JOSHY & DIVYA SABU</span>
+        Created by <span class="instructions">ANNA ROSE JOSHY &amp; DIVYA SABU</span>
         for the Data Visualization Lecture at
         <a href="https://www.fim.uni-passau.de/digitale-bildverarbeitung">
             Faculty of Computer Science and Mathematics - Chair of Cognitive sensor systems - University of Passau
@@ -46,9 +41,6 @@
     </div>
 </div>
 
-
-<!-- create buttons to select tabs -->
-<!-- create buttons to select tabs -->
 <div class="tab-row">
     <button class="tablink" onclick="openPage('DataLoading', this, 'blue')" id="defaultOpen">Data Loading</button>
     <button class="tablink" onclick="openPage('BasicVisualization', this, 'blue')">Basic Visualization</button>
@@ -57,13 +49,11 @@
 
 <!-- Tab 1 -->
 <div id="DataLoading" class="tabcontent">
-
-    <!-- data selector -->
-    <p>Select your data here: <input id="upload" type="file"></p>
-
-    <!-- data table -->
+    <p>
+        <label for="upload">Select your data here:</label>
+        <input id="upload" type="file">
+    </p>
     <div id="dataTable"></div>
-
 </div>
 
 <!-- Tab 2 -->
@@ -73,18 +63,18 @@
         <div class="vis-block">
             <h2>Scatterplot</h2>
             <p>Select dimensions to be displayed here:</p>
-            <div id="menu">
-                <form action="#">
-                    <fieldset>
-                        <label for="scatterX">x axis: </label>
-                        <select name="scatterX" id="scatterX"></select><br/>
-                        <label for="scatterY">y axis: </label>
-                        <select name="scatterY" id="scatterY"></select><br/>
-                        <label for="size">size: </label>
-                        <select name="size" id="size"></select>
-                    </fieldset>
-                </form>
-            </div>
+            <form>
+                <fieldset>
+                    <label for="scatterX">x axis:</label>
+                    <select name="scatterX" id="scatterX"></select>
+                    <br/>
+                    <label for="scatterY">y axis:</label>
+                    <select name="scatterY" id="scatterY"></select>
+                    <br/>
+                    <label for="size">size:</label>
+                    <select name="size" id="size"></select>
+                </fieldset>
+            </form>
             <div id="sp"></div>
         </div>
 
@@ -92,25 +82,17 @@
         <div class="vis-block">
             <h2>Radar Chart</h2>
             <div id="radar"></div>
-            
         </div>
     </div>
-    <!-- Legend in full-width row -->
-<div class="legend-row">
-    <div id="legend"><strong>Legend:</strong></div>
-</div>
-
-
+    <div class="legend-row">
+        <div id="legend"><strong>Legend:</strong></div>
+    </div>
     <div id="tooltip"></div>
 </div>
-
-</div>
-
 
 <!-- Tab 3: Dashboard -->
 <div id="Dashboard" class="tabcontent">
     <h1 class="zzz">Zzz<span class="metrics">Metrics...</span></h1>
-
     <div class="dashboardGrid">
 
         <!-- Parallel Coordinates Plot -->
@@ -125,16 +107,28 @@
             <h2>Scatterplot</h2>
             <label for="splomColor">Color by:</label>
             <select id="splomColor"></select>
-            <div id="chart2" style="overflow:auto; max-width:100%; max-height:80vh;"></div>
+            <div id="chart2"></div>
         </div>
 
-        <!-- Sunburst Chart (Multi-level) -->
+        <!-- HeatMap (Multi-level) -->
         <div class="vis-block">
-            <h2>Sunburst Chart</h2>
-            <div id="chart3-controls"></div>
-            <div id="chart3"></div>
+            <h2>Heatmap</h2>
+            <div id="heatmap-controls">
+                <label for="heatmap-row">Rows:</label>
+                <select id="heatmap-row"></select>
+                <label for="heatmap-col">Columns:</label>
+                <select id="heatmap-col"></select>
+                <label for="heatmap-value">Value:</label>
+                <select id="heatmap-value"></select>
+                <label for="heatmap-agg">Aggregate:</label>
+                <select id="heatmap-agg">
+                    <option value="mean">Mean</option>
+                    <option value="median">Median</option>
+                    <option value="count">Count</option>
+                </select>
+            </div>
+            <div id="heatmap"></div>
         </div>
-        
         
 
         <!-- Box Plot by Group -->
@@ -146,12 +140,6 @@
             <select id="boxCat"></select>
             <div id="chart4"></div>
         </div>
-
-    </div>
-</div>
-
-        
-
     </div>
 </div>
 
