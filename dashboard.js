@@ -852,7 +852,7 @@ function createChart4(data) {
         .call(d3.axisBottom(x))
         .selectAll("text")
         .attr("font-size", 14)
-        .attr("text-anchor", "end")
+        .attr("text-anchor", "start")
         .attr("dx", "-0.6em")
         .attr("dy", "0.3em")
         .attr("transform", "rotate(35)");
