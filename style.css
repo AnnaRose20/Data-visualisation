@@ -269,6 +269,19 @@ div.tooltip {
     background-color: white;
     min-height: 40px;
 }
+.zzz,.metrics{
+    text-align: center;       /* Horizontal centering */
+    font-size: 5rem;        /* Make it larger */
+    font-weight: bold;
+    margin-top: 20px;
+}
+.zzz{
+    color:blueviolet
+}
+.metrics{
+    color:#000
+}
+
 /* Ensure dashboard chart containers expand and show SVG properly */
 #chart1 svg,
 #chart2 svg,
