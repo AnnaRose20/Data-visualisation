@@ -253,16 +253,30 @@ function createChart1(data) {
 
     // Filtering lines based on brushes
     function updateLines() {
-        lines.attr("display", d => {
-            return axes.every(axis =>
-                !brushes[axis] || (
-                    d[axis] >= Math.min(...brushes[axis]) &&
-                    d[axis] <= Math.max(...brushes[axis])
-                )
-            ) ? null : "none";
-        });
+
+    const filtered = data.filter(d => {
+        return axes.every(axis =>
+            !brushes[axis] || (
+                d[axis] >= Math.min(...brushes[axis]) &&
+                d[axis] <= Math.max(...brushes[axis])
+            )
+        );
+    });
+    lines.attr("display", d =>
+        axes.every(axis =>
+            !brushes[axis] || (
+                d[axis] >= Math.min(...brushes[axis]) &&
+                d[axis] <= Math.max(...brushes[axis])
+            )
+        ) ? null : "none"
+    );
+
+    // Update SPLOM with filtered data
+    createChart2(filtered);
+
+};
     }
-}
+
 
 //////////////////////////////////////
 // 2. SCATTERPLOT MATRIX (SPLOM)   //
@@ -981,4 +995,3 @@ function createChart4(data) {
         .attr("font-weight", "bold")
         .text(`${numCol} by ${catCol}`);
 }
-
