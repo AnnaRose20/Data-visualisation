@@ -612,10 +612,10 @@ function createChart3(data) {
         );
 
         // Set up SVG
-        const cellSize = 32, margin = {top: 60, right: 10, bottom: 110, left: 120};
+        const cellSize = 32, margin = {top: 70, right: 10, bottom: 200, left: 120};
         const width = colVals.length * cellSize + margin.left + margin.right;
         const height = rowVals.length * cellSize + margin.top + margin.bottom;
-
+        
         d3.select("#heatmap").selectAll("*").remove();
 
         const svg = d3.select("#heatmap").append("svg")
@@ -666,17 +666,18 @@ function createChart3(data) {
             .text(d => d)
             .style("font-size", "13px");
 
-        // Col labels
-        svg.append("g").attr("transform", `translate(${margin.left},${margin.top-8})`)
+        // Col labels (moved below the heatmap)
+        svg.append("g").attr("transform", `translate(${margin.left},${margin.top + rowVals.length * cellSize + 10})`)
             .selectAll("text")
             .data(colVals)
             .join("text")
-            .attr("x", (_, j) => j*cellSize + cellSize/2)
+            .attr("x", (_, j) => j * cellSize + cellSize / 2)
             .attr("y", 0)
-            .attr("text-anchor", "middle")
-            .attr("transform", (_, j) => `rotate(-45,${j*cellSize + cellSize/2},0)`)
+            .attr("text-anchor", "start")
+            .attr("transform", (_, j) => `rotate(45,${j * cellSize + cellSize / 2},0)`)
             .text(d => d)
             .style("font-size", "13px");
+
 
         // Tooltip
         d3.select("#heatmap-tooltip").remove();
@@ -854,7 +855,7 @@ function createChart4(data) {
         .attr("text-anchor", "end")
         .attr("dx", "-0.6em")
         .attr("dy", "0.3em")
-        .attr("transform", "rotate(-35)");
+        .attr("transform", "rotate(35)");
 
     // Y Axis
     svg.append("g")
