@@ -1,10 +1,10 @@
 function detectColumnTypes(data) {
     const keys = Object.keys(data[0]);
-    const ignoreCols = ["Person ID", "_id", "ID", "Index"]; // Add more as needed
+    const ignoreCols = ["Person ID", "_id", "ID", "Index"];
     const numerical = [];
     const categorical = [];
     keys.forEach(k => {
-        if (ignoreCols.includes(k)) return; // <-- Ignore these columns
+        if (ignoreCols.includes(k)) return;
         const values = data.map(d => d[k]);
         const isNumeric = values.every(v => !isNaN(parseFloat(v)) && isFinite(v));
         (isNumeric ? numerical : categorical).push(k);
@@ -30,10 +30,6 @@ window.initDashboard = function(_data) {
     fillParcoordsCheckboxes(numerical, numerical.slice(0, 5));
 
     // === SPLOM DROPDOWNS ===
-    //fillDropdown("#splomX", numerical);
-    //fillDropdown("#splomY", numerical);
-    //setDropdown("#splomX", numerical[0]);
-    //setDropdown("#splomY", numerical[1]);
     // Populate and set event for the color-by dropdown
     fillDropdown("#splomColor", categorical);
     setDropdown("#splomColor", categorical[0]);
@@ -575,9 +571,7 @@ function createChart3(data) {
     const maxUniques = 20;
     const columns = Object.keys(data[0]);
     const cats = columns.filter(
-        col => (new Set(data.map(d => d[col])).size > 1) &&
-               (new Set(data.map(d => d[col])).size <= maxUniques) &&
-               !col.match(/id/i)
+        col => (new Set(data.map(d => d[col])).size > 1) && (new Set(data.map(d => d[col])).size <= maxUniques) && !col.match(/id/i)
     );
     const nums = columns.filter(
         col => data.every(d => !isNaN(+d[col]))
@@ -619,8 +613,7 @@ function createChart3(data) {
         // Compute matrix
         const matrix = rowVals.map(row =>
             colVals.map(col => {
-                const vals = data.filter(d => d[rowAttr] === row && d[colAttr] === col)
-                                 .map(d => +d[valueAttr]);
+                const vals = data.filter(d => d[rowAttr] === row && d[colAttr] === col) .map(d => +d[valueAttr]);
                 return vals.length ? aggFunc(vals) : null;
             })
         );
@@ -718,8 +711,7 @@ function createChart3(data) {
                 }
             })
             .on("mousemove", function(event) {
-                tooltip.style("top", (event.pageY - 40) + "px")
-                       .style("left", (event.pageX + 12) + "px");
+                tooltip.style("top", (event.pageY - 40) + "px").style("left", (event.pageX + 12) + "px");
             })
             .on("mouseout", function() {
                 d3.select(this).attr("stroke", "#fff");
